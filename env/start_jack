@@ -1,0 +1,15 @@
+#!/bin/bash
+
+export JACK_NO_AUDIO_RESERVATION=1
+jackd -P70 -p16 -t2000 -dalsa -dhw:1,0 -p480 -n3 -r48000 -s &
+#jackd -P70 -p16 -t2000 -dalsa -dhw:1,0 -p480 -n3 -r48000 -s &
+
+# Which translates to: run JACK with a realtime priority of 70 (-P70), use a port maximum of 16
+# (-p16), use a client timeout of 2000s (-t2000, default is 500 and this can cause issues with
+# some applications), use the ALSA driver stack (-dalsa), use the USB interface with cardname 
+# UA25 (-dhw:UA25, this is an Edirol UA-25 USB interface), use a frames/period setting of 128 
+# (-p128), use a periods/buffer setting of 3 (-n3, this is the recommended setting for USB 
+# interfaces, the default is 2), use a sample rate of 44.1kHz (-r44100) and use the softmode 
+# setting of ALSA (-s) to ignore xruns reported by the ALSA driver. 
+# The ampersand (&) at the end puts the whole jackd process in the background.
+
