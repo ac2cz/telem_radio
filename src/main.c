@@ -16,6 +16,22 @@
 
 int run_tests = false;
 
+int run_self_test() {
+	int rc = 0;
+	printf("\nRunning Self Test..\n");
+	//rc = test_oscillator();
+	//rc = test_iir_filter();
+	rc = test_rs_encoder();
+	rc = test_get_next_bit();
+
+	rc = test_audio_tools();
+	if (rc == 0)
+		printf("All Tests Passed");
+	else
+		printf("Some Tests Failed\n");
+	return rc;
+}
+
 int main(int argc, char *argv[]) {
 	printf("TELEM Radio Platform\n");
 	printf("Build: %s\n", VERSION);
@@ -24,17 +40,10 @@ int main(int argc, char *argv[]) {
 	if (run_tests == false) {
 		rc = start_audio_processor();
 	} else {
-		//rc = test_oscillator();
-		rc = test_iir_filter();
-
-//		printf("Running Self Test..\n");
-//		rc = test_audio_tools();
-//		if (rc == 0)
-//			printf("Test Passed");
-//		else
-//			printf("Test Failed");
+		rc = run_self_test();
+		return rc;
 	}
 
-	printf("Shutting down TELEM radio platform ..");
+	printf("Exiting TELEM radio platform ..");
 	return rc;
 }
