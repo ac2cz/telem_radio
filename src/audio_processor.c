@@ -23,6 +23,7 @@
 #include "../inc/fir_filter.h"
 #include "../inc/iir_filter.h"
 #include "../inc/telem_processor.h"
+#include "../inc/oscillator.h"
 
 jack_port_t *input_port;
 jack_port_t *output_port;
@@ -66,6 +67,8 @@ int decimate = true;
 int hpf = true;
 int send_duv_telem = false;
 int send_test_telem = false;
+int send_test_tone = false;
+int measure_test_tone = false;
 
 /* Test Type 1 packet with id 1.  This will look like Fox-1A in FoxTelem */
 unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
@@ -74,7 +77,11 @@ unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
 		0x47,0x76,0xff,0xe7,0x33,0xce,0xe2,0x81,0x29,0x78,0x80,0xf2,0x8e,0x01,0x04,0x01,0x01,0x01,0x17,0x38,
 		0xac,0x00,0x00,0x20};
 
-
+/* Test tone paramaters */
+#define OSC_TABLE_SIZE 9600
+float osc_phase = 0;
+float test_tone_freq = 5000.0f;
+float osc_sin_table[OSC_TABLE_SIZE];
 
 int position_in_packet = 0;
 int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
@@ -152,7 +159,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	 */
 	if (send_duv_telem) {
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++) {
-			if (samples_sent_for_current_bit == samples_per_duv_bit) { // We are starting a new bit
+			if (samples_sent_for_current_bit >= samples_per_duv_bit) { // We are starting a new bit
 				samples_sent_for_current_bit = 0;
 				current_bit = get_next_bit();
 			}
@@ -191,7 +198,10 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	return out;
 }
 
-
+int measurement_loops = 0;
+#define LOOPS_PER_MEASUREMENT 500 // so measure once per 5 sec
+int measurements = 0;
+float peak_value = 0;
 /**
  * The process callback for this JACK application is called in a
  * special realtime thread once for each audio cycle.
@@ -206,12 +216,32 @@ int process (jack_nframes_t nframes, void *arg) {
 	in = jack_port_get_buffer (input_port, nframes);
 	out = jack_port_get_buffer (output_port, nframes);
 
-	/*
-	 * Now process the data in out buffer before we sent it to the radio
-	 * First we apply a high pass filter at 300Hz
-	 */
-	audio_loop(in, out, nframes);
-
+//	if (send_test_tone) {
+//		for (int i=0; i < nframes; i++) {
+//			float value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
+//			out[i] = 0.2 * value;
+//		}
+//	} else if (measure_test_tone) {
+//		for (int i=0; i < nframes; i++) {
+//			if (in[i] > 0) {
+//				peak_value =+ in[i];
+//				measurements++;
+//			}
+//		}
+//		measurement_loops++;
+//		if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
+//			printf("Peak: %f\n", peak_value/(float)measurements);
+//			measurement_loops = 0;
+//			measurements = 0;
+//			peak_value = 0;
+//		}
+//	} else {
+		/*
+		 * Now process the data in out buffer before we sent it to the radio
+		 * First we apply a high pass filter at 300Hz
+		 */
+	//	audio_loop(in, out, nframes);
+//	}
 
 	return 0;
 }
@@ -243,11 +273,13 @@ int  init_filters() {
 }
 
 char *help_str =
-"ARISS Radio Platform Console Commands:\n"
+"TELEM Radio Platform Console Commands:\n"
 "(s)tatus   - display settings and status\n"
 "(f)ilter   - Toggle high pass filter on/off\n"
 "(d)ecimate - Toggle decimation on/off\n"
 "(t)elem    - Toggle DUV telemetry on/off\n"
+"tone       - Generate test tone\n"
+"measure    - Display measurement for input tone\n"
 "(h)help    - show this help\n"
 "(q)uit     - Shutdown and exit\n\n";
 
@@ -259,7 +291,7 @@ void print_status(char *name, int status) {
 }
 
 void get_status() {
-	printf("ARISS Radio status:\n");
+	printf("TELEM Radio status:\n");
 	printf(" audio engine sample rate: %" PRIu32 "\n", sample_rate);
 	printf(" samples per DUV bit: %d\n", samples_per_duv_bit);
 	int rate = sample_rate/DECIMATION_RATE;
@@ -268,6 +300,8 @@ void get_status() {
 	print_status("High Pass Filter", hpf);
 	print_status("DUV Telemetry", send_duv_telem);
 	print_status("Test Telem", send_test_telem);
+	print_status("Test tone", send_test_tone);
+	print_status("Measure test tone", measure_test_tone);
 }
 
 int cmd_console() {
@@ -298,6 +332,18 @@ int cmd_console() {
 			} else if (strcmp(line, "test") == 0) {
 				send_test_telem = !send_test_telem;
 				print_status("Test Telem", send_test_telem);
+			} else if (strcmp(line, "measure") == 0) {
+				measure_test_tone = !measure_test_tone;
+				print_status("Measure test tone", measure_test_tone);
+			} else if (strcmp(line, "tone") == 0) {
+				send_test_tone = !send_test_tone;
+				print_status("Send Test Tone", send_test_tone);
+				if (send_test_tone) {
+					rc = gen_cos_table(osc_sin_table, OSC_TABLE_SIZE);
+					if (rc != 0)
+						printf("Error generating sin table\n");
+				}
+
 			} else if (strcmp(line, "status") == 0 || strcmp(line, "s") == 0) {
 				get_status();
 			} else if (strcmp(line, "help") == 0 || strcmp(line, "h") == 0) {
