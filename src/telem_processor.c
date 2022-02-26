@@ -15,6 +15,10 @@ int rd_state = 0; // 8b10b Encoder state, initialized once at startup
 
 unsigned char parities[DUV_PARITIES_LENGTH];
 
+void init_rd_state() {
+	rd_state = 0;
+}
+
 /**
  * This takes a telemetry frame and encodes it ready for transmission
  */
@@ -32,7 +36,7 @@ void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet) {
 	// get the RS parities
 	for(int i=0;i< DUV_PARITIES_LENGTH;i++)
 		encoded_packet[j++] = encode_8b10b(&rd_state,parities[i]);
-	encoded_packet[j++] = encode_8b10b(&rd_state,-1); // Transmit end-of-frame flag
+	encoded_packet[j] = encode_8b10b(&rd_state,-1); // Insert end-of-frame flag
 }
 
 

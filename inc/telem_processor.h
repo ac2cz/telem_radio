@@ -15,10 +15,13 @@
 #define DUV_DATA_LENGTH 64
 #define DUV_PARITIES_LENGTH 32
 #define BITS_PER_10b_WORD 10
-#define ONE_VALUE 0.01
-#define ZERO_VALUE -0.01
+#define ONE_VALUE 0.001
+#define ZERO_VALUE -0.001
 
-
+/* Set the running disparity to zero.  This is called just once at startup,
+ * but we may call it more than once if we are running test routines.
+ */
+void init_rd_state();
 /**
  * Takes an array of bytes as input and encodes them as 10 bits words with RS parities
  */

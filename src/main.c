@@ -18,14 +18,19 @@ int run_tests = false;
 
 int run_self_test() {
 	int rc = 0;
+	int fail = 0;
 	printf("\nRunning Self Test..\n");
 	//rc = test_oscillator();
 	//rc = test_iir_filter();
 	rc = test_rs_encoder();
+	if (rc != 0) fail = 1;
+	rc = test_sync_word();
+	if (rc != 0) fail = 1;
 	rc = test_get_next_bit();
-
+	if (rc != 0) fail = 1;
 	rc = test_audio_tools();
-	if (rc == 0)
+	if (rc != 0) fail = 1;
+	if (fail == 0)
 		printf("All Tests Passed");
 	else
 		printf("Some Tests Failed\n");

@@ -40,7 +40,8 @@
   * Test routine to test the functions in this file.  Returns true if all tests pass
   */
  int test_audio_tools() {
-	 const char * TEST = "test_audio_tools";
+	 //const char * TEST = "test_audio_tools";
+	 printf("TESTING audio_tools .. ");
 	 char byte_buffer[4] = {0x00, 0x40, 0x00, 0xC0 };
 	 float float_buffer[2];
 	 float expected_result[2] = {0.5f, -0.5f};
@@ -51,26 +52,30 @@
 
 	 /* Check if we got the right result */
 	 for (int i = 0; i< (sizeof(expected_result)/sizeof(expected_result[0])); i++) {
-		 printf("%s: byte to float %d %f",TEST, i,float_buffer[i]);
-		 if (expected_result[i] == float_buffer[i])
-			 printf("\t.. pass\n");
-		 else {
+		 // printf("%s: byte to float %d %f",TEST, i,float_buffer[i]);
+		 if (expected_result[i] != float_buffer[i])
+			 // printf("\t.. pass\n");
+			 //else {
 			 fail = 1;
-			 printf("\t.. fail\n");
-		 }
+		 //printf("\t.. fail\n");
+		 //}
 	 }
 
 	 get_bytes_from_floats(float_buffer, out_byte_buffer, sizeof(byte_buffer));
 
 	 /* Check if we got the right result */
 	 for (int i = 0; i< (sizeof(out_byte_buffer)/sizeof(out_byte_buffer[0])); i++) {
-		 printf("%s: float to byte %d %d",TEST, i,out_byte_buffer[i]);
-		 if (byte_buffer[i] == out_byte_buffer[i])
-			 printf("\t.. pass\n");
-		 else {
+		 // printf("%s: float to byte %d %d",TEST, i,out_byte_buffer[i]);
+		 if (byte_buffer[i] != out_byte_buffer[i])
+			 //	 printf("\t.. pass\n");
+			 //else {
 			 fail = 1;
-			 printf("\t.. fail\n");
-		 }
+		 //	 printf("\t.. fail\n");
+		 // }
 	 }
+	 if (fail == 0)
+		 printf("Pass\n");
+	 else
+		 printf("Fail\n");
 	 return fail;
  }

@@ -671,7 +671,7 @@ int Encode_8b10b[2][256] = {
 // Returns 10-bit channel word, right justified. Transmit this word left-to-right.
 int encode_8b10b(
     int *state, // pointer to encoder state (run disparity, RD)
-    uint16_t data){
+    int16_t data){
 
   uint32_t w,st;
 

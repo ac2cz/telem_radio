@@ -15,6 +15,7 @@
 int start_audio_processor (void);
 
 int test_rs_encoder();
+int test_sync_word();
 int test_get_next_bit();
 
 #endif /* AUDIO_PROCESSOR_H_ */

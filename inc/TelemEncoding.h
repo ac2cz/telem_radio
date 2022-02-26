@@ -26,6 +26,6 @@ void update_rs(
 
 int encode_8b10b(
     int *state, // pointer to encoder state (run disparity, RD)
-    uint16_t data);
+    int16_t data);
 
 #endif /* TELEMENCODING_H_ */

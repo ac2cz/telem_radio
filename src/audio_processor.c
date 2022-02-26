@@ -37,6 +37,10 @@ float decimate_filter_xv[DECIMATE_FILTER_LEN];
 float interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 float interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
+#define DUV_BIT_FILTER_LEN 48
+float duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
+float duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
+
 float filtered_audio_buffer[PERIOD_SIZE];
 float decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation to 9600
 float interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000
@@ -75,7 +79,6 @@ unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
 int position_in_packet = 0;
 int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
 
-
 uint16_t test_encoded_packet[DUV_PACKET_LENGTH+1]; // includes space for SYNC WORD at the end.
 
 int get_next_bit() {
@@ -83,7 +86,6 @@ int get_next_bit() {
 
 	if (bits_sent_for_current_word >= BITS_PER_10b_WORD) { // We are starting a new 10b word
 		bits_sent_for_current_word = 0;
-
 
 		if (words_sent_for_current_packet >= DUV_PACKET_LENGTH) { // We are ready for a new packet
 			words_sent_for_current_packet = 0;
@@ -156,7 +158,8 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 			}
 			samples_sent_for_current_bit++;
 			float bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
-			decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
+			float filtered_bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
+			decimated_audio_buffer[i] += filtered_bit_audio_value; // add the telemetry
 		}
 	}
 
@@ -230,6 +233,12 @@ int  init_filters() {
 
 	int interpolation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
 	rc = gen_raised_cosine_coeffs(interpolate_filter_coeffs, sample_rate, interpolation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
+	if (rc != 0)
+			return rc;
+
+	int duv_bit_cutoff_freq = 200;
+		rc = gen_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
+
 	return rc;
 }
 
@@ -258,6 +267,7 @@ void get_status() {
 	print_status("Decimate", decimate);
 	print_status("High Pass Filter", hpf);
 	print_status("DUV Telemetry", send_duv_telem);
+	print_status("Test Telem", send_test_telem);
 }
 
 int cmd_console() {
@@ -285,6 +295,9 @@ int cmd_console() {
 			} else if (strcmp(line, "telem") == 0 || strcmp(line, "t") == 0) {
 				send_duv_telem = !send_duv_telem;
 				print_status("Telemetry", send_duv_telem);
+			} else if (strcmp(line, "test") == 0) {
+				send_test_telem = !send_test_telem;
+				print_status("Test Telem", send_test_telem);
 			} else if (strcmp(line, "status") == 0 || strcmp(line, "s") == 0) {
 				get_status();
 			} else if (strcmp(line, "help") == 0 || strcmp(line, "h") == 0) {
@@ -297,7 +310,7 @@ int cmd_console() {
 		}
 	}
 	free(line);
-	printf("Stopping audio processor ..");
+	printf("Stopping audio processor ..\n");
 
 	return 0;
 }
@@ -411,7 +424,7 @@ int start_audio_processor (void) {
     rc = cmd_console();
 
 	jack_client_close (client);
-	exit (rc);
+	return rc;
 }
 
 unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0x84,0x27,0x77,0x98,0xb5,0xf3,0x89,0xf1,
@@ -420,6 +433,7 @@ unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0
 int test_rs_encoder() {
 	int fail = 0;
 	printf("TESTING Rs Encoder .. ");
+	init_rd_state();
 	// Call the RS encoder without 8b10b encoding
 	test_telem_encoder(test_packet, test_encoded_packet);
 
@@ -441,8 +455,29 @@ int test_rs_encoder() {
 	return fail;
 }
 
+int test_sync_word() {
+	// test that the sync word is the last word in the packet
+	int fail = 0;
+	printf("TESTING Sync word .. %x %x\n",0xfa, (~0xfa) & 0x3ff);
+	init_rd_state();
+	encode_duv_telem_packet(test_packet, test_encoded_packet);
+
+	uint16_t word = test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH];
+	printf(" Sync Word is %x \n",word );
+
+	if (word != 0x0fa && word != 0x305) // 0x305 is ~0xfa
+		fail = 1;
+
+	if (fail == 0)
+		printf(" Sync word .. Pass\n");
+	else
+		printf(" Sync word .. Fail\n");
+	return fail;
+}
+
 int test_get_next_bit() {
-	printf("TESTING get_next_bit .. ");
+	printf("TESTING get_next_bit .. \n");
+	init_rd_state();
 	// Generate the first 40 bits of the test packet - the header
 	// First four bytes are: 0x51,0x01, 0x40, 0xd8
 	// These should encode as 10b words:
@@ -465,14 +500,14 @@ int test_get_next_bit() {
 
 	for (int i=0; i < 30; i++) {
 		int b = get_next_bit();
-//		printf("%i ",b);
+		printf(" %i",b);
 
 		if (b != expected_result[i]) {
 			fail = 1;
-//			printf("<-err ");
+			printf("<-err ");
 		}
-//		if ((i+1) % 10 == 0)
-//			printf("\n");
+		if ((i+1) % 10 == 0)
+			printf("\n");
 	}
 
 	// Now check the first and last parity bytes
@@ -489,8 +524,8 @@ int test_get_next_bit() {
 	}
 
 	if (fail == 0)
-		printf("Pass\n");
+		printf(" get_next_bit .. Pass\n");
 	else
-		printf("Fail\n");
+		printf(" get_next_bit .. Fail\n");
 	return fail;
 }
