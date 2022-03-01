@@ -15,6 +15,10 @@
 #define DUV_DATA_LENGTH 64
 #define DUV_PARITIES_LENGTH 32
 #define BITS_PER_10b_WORD 10
+
+/* These values specify the strength of the telemetry.  They should be carefully calculated and set.
+ * This should probablly be in a configuration file.
+ */
 #define ONE_VALUE 0.01
 #define ZERO_VALUE -0.01
 

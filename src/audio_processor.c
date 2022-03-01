@@ -36,10 +36,14 @@ int sample_rate = 0;
 float decimate_filter_coeffs[DECIMATE_FILTER_LEN];
 float decimate_filter_xv[DECIMATE_FILTER_LEN];
 
+#define FIR_HIGHPASS_FILTER_LEN 480  // this is an experimental alternative to IIR, but does not worK!
+float fir_highpass_filter_coeffs[DECIMATE_FILTER_LEN];
+float fir_highpass_filter_xv[DECIMATE_FILTER_LEN];
+
 float interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 float interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
-#define DUV_BIT_FILTER_LEN 48
+#define DUV_BIT_FILTER_LEN 96  // this length seems to be critical 48 is too short.  128 does not work at all.
 float duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
 float duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
@@ -182,6 +186,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	if (hpf) {
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
 			decimated_audio_buffer[i] = iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
+			//decimated_audio_buffer[i] = fir_filter(decimated_audio_buffer[i], fir_highpass_filter_coeffs, fir_highpass_filter_xv, FIR_HIGHPASS_FILTER_LEN);
 	}
 
 	/**
@@ -201,15 +206,17 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	 * from the inserted samples.
 	 */
 	if (decimate) {
+		float gain = (float)DECIMATION_RATE;
 		for (int i = 0; i < nframes; i++) {
 			decimate_count++;
 			if (decimate_count == DECIMATION_RATE) {
 				decimate_count = 0;
-				interpolated_audio_buffer[i] = DECIMATION_RATE * decimated_audio_buffer[i/DECIMATION_RATE];
+				interpolated_audio_buffer[i] = gain * decimated_audio_buffer[i/DECIMATION_RATE];
 			} else
 				interpolated_audio_buffer[i] = 0.0f;
 
 		}
+		/* Now filter out the duplications of the spectrum that interpolation introduces */
 		for (int i = 0; i< nframes; i++) {
 			out[i] = fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
 		}
@@ -285,16 +292,26 @@ void jack_shutdown (void *arg) {
 
 int  init_filters() {
 	printf("Generating filters ..\n");
+
+	/* Decimation filter */
 	int decimation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
 	int rc = gen_raised_cosine_coeffs(decimate_filter_coeffs, sample_rate, decimation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	if (rc != 0)
 		return rc;
 
+	/* FOR TESTING - DOES NOT WORK - FIR High Pass filter */
+	int fir_highpass_cutoff_freq = 300;
+	rc = gen_raised_cosine_coeffs(fir_highpass_filter_coeffs, sample_rate/DECIMATION_RATE, fir_highpass_cutoff_freq, 0.5f, FIR_HIGHPASS_FILTER_LEN);
+	if (rc != 0)
+		return rc;
+
+	/* Interpolation filter */
 	int interpolation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
 	rc = gen_raised_cosine_coeffs(interpolate_filter_coeffs, sample_rate, interpolation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	if (rc != 0)
 		return rc;
 
+	/* Bit shape filter - SHOULD BE UPDATED TO ROOT RAISED COSINE TO MATCH FOXTELEM */
 	int duv_bit_cutoff_freq = 200;
 	rc = gen_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
 

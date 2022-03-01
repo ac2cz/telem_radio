@@ -33,6 +33,7 @@ float fir_filter(float in, float *coeffs, float *xv, int len) {
  * for allocating the needed space for the array.
  */
 int gen_raised_cosine_coeffs(float *coeffs, float sampleRate, float freq, float alpha, int len) {
+	printf("  Generating Raised Cosine Filter Sample Rate: %d Freq:%d Alpha:%f Len:%d\n", (int)sampleRate, (int)freq, alpha, len);
 	int M = len-1;
 	float Fc = freq/sampleRate;
 
