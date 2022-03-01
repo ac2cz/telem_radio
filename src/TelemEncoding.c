@@ -689,6 +689,17 @@ int encode_8b10b(
   return w & 0x3ff;
 }
 
+unsigned char reverse_8b10b_lookup(uint16_t word) {
+	for (int rd=0; rd<2; rd++)
+		for (int i=0; i<256; i++) {
+			int testValue = Encode_8b10b[rd][i];
+			if ((testValue & 0x3ff) == word) {
+				return (unsigned char)i; // return the position in the lookup table where we found the code word
+			}
+		}
+	return -1;
+}
+
 void write_little_endian(unsigned int word, int num_bytes, FILE *wav_file)
 {
 	unsigned buf;

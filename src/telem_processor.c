@@ -39,7 +39,10 @@ void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet) {
 	encoded_packet[j] = encode_8b10b(&rd_state,-1); // Insert end-of-frame flag
 }
 
-
+/**
+ * Generate a test packet with RS checkbytes but without 8b10b encoding.  This is
+ * useful for testing if the core RS encoder is working
+ */
 int test_telem_encoder(unsigned char *packet, uint16_t *encoded_packet) {
 	int fail = 0;
 	memset(parities,0,sizeof(parities)); // Do this before every frame
@@ -56,3 +59,4 @@ int test_telem_encoder(unsigned char *packet, uint16_t *encoded_packet) {
 		encoded_packet[j++] = parities[i];
 	return fail;
 }
+

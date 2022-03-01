@@ -30,6 +30,8 @@ int run_self_test() {
 	if (rc != 0) fail = 1;
 	rc = test_audio_tools();
 	if (rc != 0) fail = 1;
+
+	rc = test_modulate_bit();
 	if (fail == 0)
 		printf("All Tests Passed");
 	else

@@ -9,7 +9,6 @@
 
 #include <stdint.h>
 
-
 #define CHARACTER_BITS 10
 #define CHARACTERS_PER_LONGWORD 3
 #define CHARACTER_MASK ((1<<CHARACTER_BITS)-1)
@@ -27,5 +26,6 @@ void update_rs(
 int encode_8b10b(
     int *state, // pointer to encoder state (run disparity, RD)
     int16_t data);
+
 
 #endif /* TELEMENCODING_H_ */

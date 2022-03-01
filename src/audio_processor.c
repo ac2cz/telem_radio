@@ -24,6 +24,7 @@
 #include "../inc/iir_filter.h"
 #include "../inc/telem_processor.h"
 #include "../inc/oscillator.h"
+//#include "../inc/TelemEncoding.h"
 
 jack_port_t *input_port;
 jack_port_t *output_port;
@@ -64,11 +65,12 @@ int words_sent_for_current_packet; // how many 10b words we have sent for the cu
 int current_bit = 0; // the value of the current bit we are sending
 
 int decimate = true;
-int hpf = true;
+int hpf = true; // filter the transponder audio
 int send_duv_telem = false;
-int send_test_telem = false;
-int send_test_tone = false;
-int measure_test_tone = false;
+int send_test_telem = false; // send a 10101 test telem sequence
+int send_test_tone = false; // output a steady tone for measurement of a sound card
+int measure_test_tone = false; // display the peak ampltude of a received tone to measure the sound card
+int lpf = true;  // filter the DUV telem bits
 
 /* Test Type 1 packet with id 1.  This will look like Fox-1A in FoxTelem */
 unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
@@ -83,7 +85,7 @@ float osc_phase = 0;
 float test_tone_freq = 5000.0f;
 float osc_sin_table[OSC_TABLE_SIZE];
 
-int position_in_packet = 0;
+//int position_in_packet = 0;
 int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
 
 uint16_t test_encoded_packet[DUV_PACKET_LENGTH+1]; // includes space for SYNC WORD at the end.
@@ -93,26 +95,54 @@ int get_next_bit() {
 
 	if (bits_sent_for_current_word >= BITS_PER_10b_WORD) { // We are starting a new 10b word
 		bits_sent_for_current_word = 0;
-
-		if (words_sent_for_current_packet >= DUV_PACKET_LENGTH) { // We are ready for a new packet
+		if (first_packet_to_be_sent) {
+			first_packet_to_be_sent = false; // we have sent at least one word so this is no longer the start of a transmission
+		} else {
+			// we sent a word from this packet so increment the counter
+			words_sent_for_current_packet++;
+		}
+		if (words_sent_for_current_packet >= DUV_PACKET_LENGTH+1) { // We are ready for a new packet.  We have the sync word in the final word
 			words_sent_for_current_packet = 0;
 
 			// if we do nothing here then we keep sending the test packet in a loop
+
+			// this turns off telemetry so we only send 1 frame
+		//	send_duv_telem = false;
+		//	first_packet_to_be_sent = true;
 		}
-		words_sent_for_current_packet++;
+
 	}
 	// so get the value
-
-	if (send_test_telem) {
-		current_bit = !current_bit; // TESTING - just toggle the bit to generate 200Hz tone
-	} else {
-		uint16_t current_word = test_encoded_packet[words_sent_for_current_packet];
-		// we send most significant bit first of the 10 bit word
-		int shift_amt = 9 - bits_sent_for_current_word;
-		current_bit = ((current_word & 0x3ff) >> shift_amt)  & 0x01;
+	/* If we are starting to transmit then send the sync word first */
+	uint16_t current_word = 0xfa;
+	if (!first_packet_to_be_sent) {
+		current_word = test_encoded_packet[words_sent_for_current_packet];
 	}
+	// we send most significant bit first of the 10 bit word
+	int shift_amt = 9 - bits_sent_for_current_word;
+	current_bit = ((current_word & 0x3ff) >> shift_amt)  & 0x01;
+
 	bits_sent_for_current_word++;
 	return current_bit;
+}
+
+double modulate_bit() {
+
+	if ((samples_sent_for_current_bit == 0 && bits_sent_for_current_word == 0 && words_sent_for_current_packet == 0 )||  // starting a new packet
+			(samples_sent_for_current_bit >= samples_per_duv_bit )) { // We are starting a new bit
+		samples_sent_for_current_bit = 0;
+		if (send_test_telem)
+			current_bit = !current_bit; // TESTING - just toggle the bit to generate 200Hz tone
+		else
+			current_bit = get_next_bit();
+	}
+	samples_sent_for_current_bit++;
+	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
+	//	int bit_audio_value = current_bit ? 1 : 0;
+
+		if (lpf)
+			bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
+	return bit_audio_value;
 }
 
 /**
@@ -159,14 +189,8 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	 */
 	if (send_duv_telem) {
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++) {
-			if (samples_sent_for_current_bit >= samples_per_duv_bit) { // We are starting a new bit
-				samples_sent_for_current_bit = 0;
-				current_bit = get_next_bit();
-			}
-			samples_sent_for_current_bit++;
-			float bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
-			float filtered_bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
-			decimated_audio_buffer[i] += filtered_bit_audio_value; // add the telemetry
+			float bit_audio_value = modulate_bit();
+			decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
 		}
 	}
 
@@ -201,7 +225,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 int measurement_loops = 0;
 #define LOOPS_PER_MEASUREMENT 500 // so measure once per 5 sec
 int measurements = 0;
-float peak_value = 0;
+float peak_value = 0.0f;
 /**
  * The process callback for this JACK application is called in a
  * special realtime thread once for each audio cycle.
@@ -216,32 +240,37 @@ int process (jack_nframes_t nframes, void *arg) {
 	in = jack_port_get_buffer (input_port, nframes);
 	out = jack_port_get_buffer (output_port, nframes);
 
-//	if (send_test_tone) {
-//		for (int i=0; i < nframes; i++) {
-//			float value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
-//			out[i] = 0.2 * value;
-//		}
-//	} else if (measure_test_tone) {
-//		for (int i=0; i < nframes; i++) {
-//			if (in[i] > 0) {
-//				peak_value =+ in[i];
-//				measurements++;
-//			}
-//		}
-//		measurement_loops++;
-//		if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
-//			printf("Peak: %f\n", peak_value/(float)measurements);
-//			measurement_loops = 0;
-//			measurements = 0;
-//			peak_value = 0;
-//		}
-//	} else {
+	if (send_test_tone) {
+		for (int i=0; i < nframes; i++) {
+			float value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
+			out[i] = 0.2 * value;
+		}
+	} else if (measure_test_tone) {
+		for (int i=0; i < nframes; i++) {
+			//out[i] = 0; // silence the output, except this does not work if we were already receiving a tone?
+			out[i] = in[i];  // play what we are measuring
+			//printf("%f\n", in[i]);
+
+			if (in[i] > peak_value)  //////////// This compare does not WORK!!
+				peak_value = in[i];
+
+			measurements++;
+
+		}
+		measurement_loops++;
+		if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
+			printf("Peak over %d measurements: %f\n", measurements, peak_value);
+			measurement_loops = 0;
+			measurements = 0;
+			peak_value = 0;
+		}
+	} else {
 		/*
 		 * Now process the data in out buffer before we sent it to the radio
 		 * First we apply a high pass filter at 300Hz
 		 */
-	//	audio_loop(in, out, nframes);
-//	}
+		audio_loop(in, out, nframes);
+	}
 
 	return 0;
 }
@@ -264,30 +293,33 @@ int  init_filters() {
 	int interpolation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
 	rc = gen_raised_cosine_coeffs(interpolate_filter_coeffs, sample_rate, interpolation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	if (rc != 0)
-			return rc;
+		return rc;
 
 	int duv_bit_cutoff_freq = 200;
-		rc = gen_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
+	rc = gen_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
 
 	return rc;
 }
 
 char *help_str =
-"TELEM Radio Platform Console Commands:\n"
-"(s)tatus   - display settings and status\n"
-"(f)ilter   - Toggle high pass filter on/off\n"
-"(d)ecimate - Toggle decimation on/off\n"
-"(t)elem    - Toggle DUV telemetry on/off\n"
-"tone       - Generate test tone\n"
-"measure    - Display measurement for input tone\n"
-"(h)help    - show this help\n"
-"(q)uit     - Shutdown and exit\n\n";
+		"TELEM Radio Platform Console Commands:\n"
+		" (s)tatus   - display settings and status\n"
+		" (f)ilter   - Toggle high pass filter on/off\n"
+		" (l)ow pass filter   - Toggle bit low high pass filter on/off\n"
+		" (d)ecimate - Toggle decimation on/off\n"
+		" (t)elem    - Toggle DUV telemetry on/off\n"
+		" test       - DUV telem contains only 101010 on/off\n"
+		" tone       - Generate test tone\n"
+		" freq <Hz>  - Set freq of test tone\n"
+		" measure    - Display measurement for input tone\n"
+		" (h)help    - show this help\n"
+		" (q)uit     - Shutdown and exit\n\n";
 
 
 
 void print_status(char *name, int status) {
-	char *val = status ? "ON" : "OFF";
-	printf(" %s : %s\n",name, val);
+	char *val = status ? " ON " : " OFF";
+	printf(" %s : %s\n",val, name);
 }
 
 void get_status() {
@@ -298,10 +330,12 @@ void get_status() {
 	printf(" decimation factor: %d with audio loop sample rate %d\n",DECIMATION_RATE, rate);
 	print_status("Decimate", decimate);
 	print_status("High Pass Filter", hpf);
+	print_status("Bit Low Pass Filter", lpf);
 	print_status("DUV Telemetry", send_duv_telem);
 	print_status("Test Telem", send_test_telem);
-	print_status("Test tone", send_test_tone);
-	print_status("Measure test tone", measure_test_tone);
+	printf("Test tone freq %d Hz\n",(int)test_tone_freq);
+	print_status("Generate test tone", send_test_tone);
+	print_status("Measure input test tone", measure_test_tone);
 }
 
 int cmd_console() {
@@ -318,24 +352,46 @@ int cmd_console() {
 	while (running) {
 		int rc = getline(&line, &buffer_size, stdin);
 		if (rc > 1) {
+			char * token;
 			line[strcspn(line, "\n")] = '\0';
+			token = strsep(&line, " ");
 
-			if (strcmp(line, "filter") == 0|| strcmp(line, "f") == 0) {
+			if (strcmp(token, "filter") == 0|| strcmp(token, "f") == 0) {
 				hpf = !hpf;
 				print_status("High Pass Filter", hpf);
-			} else if (strcmp(line, "decimate") == 0 || strcmp(line, "d") == 0) {
+			} else if (strcmp(token, "low") == 0 || strcmp(token, "l") == 0) {
+				lpf = !lpf;
+				print_status("Bit Low Pass Filter", lpf);
+			} else if (strcmp(token, "decimate") == 0 || strcmp(token, "d") == 0) {
 				decimate = !decimate;
 				print_status("Decimate", decimate);
-			} else if (strcmp(line, "telem") == 0 || strcmp(line, "t") == 0) {
+			} else if (strcmp(token, "telem") == 0 || strcmp(token, "t") == 0) {
 				send_duv_telem = !send_duv_telem;
+				if (send_duv_telem == false) { // reset the modulator ready for next time
+					send_duv_telem = false;
+					first_packet_to_be_sent = true;
+					samples_sent_for_current_bit = 0;
+					bits_sent_for_current_word = 0;
+					words_sent_for_current_packet = 0;
+					init_rd_state();
+				}
 				print_status("Telemetry", send_duv_telem);
-			} else if (strcmp(line, "test") == 0) {
+			} else if (strcmp(token, "test") == 0) {
 				send_test_telem = !send_test_telem;
 				print_status("Test Telem", send_test_telem);
-			} else if (strcmp(line, "measure") == 0) {
+			} else if (strcmp(token, "measure") == 0) {
 				measure_test_tone = !measure_test_tone;
 				print_status("Measure test tone", measure_test_tone);
-			} else if (strcmp(line, "tone") == 0) {
+			} else if (strcmp(token, "freq") == 0) {
+				token = strsep(&line, " ");
+				float freq = atof(token);
+				if (freq == 0.0)
+					printf("Invalid frequency: %s\n", token);
+				else {
+					test_tone_freq = freq;
+					printf("Test tone frequency now: %d Hz\n", (int)test_tone_freq);
+				}
+			} else if (strcmp(token, "tone") == 0) {
 				send_test_tone = !send_test_tone;
 				print_status("Send Test Tone", send_test_tone);
 				if (send_test_tone) {
@@ -344,11 +400,11 @@ int cmd_console() {
 						printf("Error generating sin table\n");
 				}
 
-			} else if (strcmp(line, "status") == 0 || strcmp(line, "s") == 0) {
+			} else if (strcmp(token, "status") == 0 || strcmp(token, "s") == 0) {
 				get_status();
-			} else if (strcmp(line, "help") == 0 || strcmp(line, "h") == 0) {
+			} else if (strcmp(token, "help") == 0 || strcmp(token, "h") == 0) {
 				printf("%s\n",help_str);
-			} else if (strcmp(line, "quit") == 0 || strcmp(line, "q") == 0) {
+			} else if (strcmp(token, "quit") == 0 || strcmp(token, "q") == 0) {
 				break;
 			} else {
 				printf("Unknown command: %s\n", line);
@@ -467,7 +523,7 @@ int start_audio_processor (void) {
 	free (ports);
 
 	/* keep running until stopped by the user */
-    rc = cmd_console();
+	rc = cmd_console();
 
 	jack_client_close (client);
 	return rc;
@@ -523,6 +579,10 @@ int test_sync_word() {
 
 int test_get_next_bit() {
 	printf("TESTING get_next_bit .. \n");
+	/* reset the state of the modulator */
+	samples_sent_for_current_bit = 0;
+	bits_sent_for_current_word = 0;
+	words_sent_for_current_packet = 0;
 	init_rd_state();
 	// Generate the first 40 bits of the test packet - the header
 	// First four bytes are: 0x51,0x01, 0x40, 0xd8
@@ -535,16 +595,17 @@ int test_get_next_bit() {
 
 	int fail = 0;
 	int expected_result[] = {
+			0,0,1,1,1,1,1,0,1,0,  // the sync word 0xfa
 			1,0,0,0,1,1,0,1,0,1,
 			0,1,1,1,0,1,0,1,0,0,
 			1,0,0,1,1,1,0,1,0,1,
 			0,0,1,1,0,0,0,1,1,0};
 
 	encode_duv_telem_packet(test_packet, test_encoded_packet);
-//	printf("%x %x %x\n",test_packet[0], test_packet[1], test_packet[2]);
-//	printf("%x %x %x\n",test_encoded_packet[0], test_encoded_packet[1], test_encoded_packet[2]);
+	//	printf("%x %x %x\n",test_packet[0], test_packet[1], test_packet[2]);
+	//	printf("%x %x %x\n",test_encoded_packet[0], test_encoded_packet[1], test_encoded_packet[2]);
 
-	for (int i=0; i < 30; i++) {
+	for (int i=0; i < 50; i++) {
 		int b = get_next_bit();
 		printf(" %i",b);
 
@@ -559,8 +620,8 @@ int test_get_next_bit() {
 	// Now check the first and last parity bytes
 	// First should be 0x19 -> encoded as 0x264
 	// Last is 0xa7 -> encoded as 0x7a
-//	printf("First parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH] );
-//	printf("Last Parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1] );
+	//	printf("First parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH] );
+	//	printf("Last Parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1] );
 
 	if (test_encoded_packet[DUV_DATA_LENGTH] != 0x264) {
 		fail = 1;
@@ -574,4 +635,127 @@ int test_get_next_bit() {
 	else
 		printf(" get_next_bit .. Fail\n");
 	return fail;
+}
+
+int test_modulate_bit() {
+	printf("TESTING modulate_bit .. \n");
+	int fail = 0;
+	int expected_result1[] = {
+			0,0,1,1,1,1,1,0,1,0,  // the sync word 0xfa
+			1,0,0,0,1,1,0,1,0,1,
+			0,1,1,1,0,1,0,1,0,0,
+			1,0,0,1,1,1,0,1,0,1,
+			0,0,1,1,0,0,0,1,1,0};
+
+	int expected_result2[] = {
+			1,1,0,0,0,0,0,1,0,1,  // the sync word 0xfa
+			1,0,0,0,1,1,0,1,0,1,
+			0,1,1,1,0,1,0,1,0,0,
+			1,0,0,1,1,1,0,1,0,1,
+			0,0,1,1,0,0,0,1,1,0};
+
+	/* reset the state of the modulator */
+	first_packet_to_be_sent = true;
+	samples_sent_for_current_bit = 0;
+	bits_sent_for_current_word = 0;
+	words_sent_for_current_packet = 0;
+	current_bit = 0;
+	init_rd_state();
+
+	sample_rate = 48000;
+	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
+
+
+	encode_duv_telem_packet(test_packet, test_encoded_packet);
+
+	int j=0;
+
+
+	// Start of transmission test
+	//double bit_audio_value;
+	/* Run for whole first word, the sync word and check that the first and last sample of each bit is correct */
+	for (int i=0; i < 600; i++) {
+		double bit_audio_value = modulate_bit();
+		if ((i) % samples_per_duv_bit == 0) {
+			// first sample of bit
+			printf ("%.3f ",bit_audio_value);
+			double test_value = expected_result1[j] ? ONE_VALUE : ZERO_VALUE;
+			if (test_value != bit_audio_value) {
+				printf (" **start err ");
+				fail = 1;
+			}
+		}
+		if ((i+1) % samples_per_duv_bit == 0) {
+			// last sample of bit
+			//printf ("%.3f ",i, bit_audio_value);
+			double test_value = expected_result1[j++] ? ONE_VALUE : ZERO_VALUE;
+			if (test_value != bit_audio_value) {
+				printf (" **end err, got '%.3f' ",bit_audio_value);
+				fail = 1;
+			}
+		}
+
+	}
+	printf("\n");
+
+	uint16_t decode = 0;
+	int b = 9; // bit position in word
+	int check_expected_results = false;
+	int bit = 0;
+	j = 0;
+	// test end of packet and start of next
+	for (int w=0; w < DUV_PACKET_LENGTH+5; w++) { // +5 so that we check first 5 words of next packet
+		if (w == DUV_PACKET_LENGTH) {
+			printf("end of packet\n\n");
+			check_expected_results = true; // now we check the first 40 bits of the second packet, inc sync word
+		}
+		printf ("w:%d ",w);
+		for (int i=0; i < 600; i++) { // 600 samples is a whole word
+			double bit_audio_value = modulate_bit();
+
+			if ((i) % samples_per_duv_bit == 0) {
+				printf ("%.3f ",bit_audio_value);
+				if (check_expected_results) {
+					double test_value = expected_result2[j++] ? ONE_VALUE : ZERO_VALUE;
+					if (test_value != bit_audio_value) {
+						printf (" **start err ");
+						fail = 1;
+					}
+
+				}
+				bit = 0;
+				if (bit_audio_value > 0)
+					bit = 1;
+				decode += (bit << b--);
+			}
+		}
+		unsigned char c = reverse_8b10b_lookup(decode);
+		printf(" 10b: %x 8b: %x",decode, c);
+		if (w < DUV_DATA_LENGTH) {
+			if (c != test_packet[w]) {
+				printf(" fail \n");
+				fail = 1;
+			} else {
+				printf(" pass \n");
+			}
+		} else if (w < DUV_PACKET_LENGTH) {
+			if (c != test_parities_check[w-DUV_DATA_LENGTH]) {
+				printf(" fail \n");
+				fail = 1;
+			} else {
+				printf(" pass \n");
+			}
+		} else {
+			printf("\n"); // these are checked bit by bit above
+		}
+		decode = 0;
+		b = 9;
+	}
+
+	if (fail == 0)
+		printf(" modulate_bit .. Pass\n");
+	else
+		printf(" modulate_bit .. Fail\n");
+	return fail;
+
 }

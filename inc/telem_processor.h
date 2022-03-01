@@ -15,8 +15,8 @@
 #define DUV_DATA_LENGTH 64
 #define DUV_PARITIES_LENGTH 32
 #define BITS_PER_10b_WORD 10
-#define ONE_VALUE 0.001
-#define ZERO_VALUE -0.001
+#define ONE_VALUE 0.01
+#define ZERO_VALUE -0.01
 
 /* Set the running disparity to zero.  This is called just once at startup,
  * but we may call it more than once if we are running test routines.
@@ -28,5 +28,6 @@ void init_rd_state();
 void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet);
 
 int test_telem_encoder();
+unsigned char reverse_8b10b_lookup(uint16_t word);
 
 #endif /* TELEM_PROCESSOR_C_ */
