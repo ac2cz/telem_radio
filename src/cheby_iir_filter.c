@@ -16,10 +16,11 @@
  *
  */
 
+#include "../inc/cheby_iir_filter.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "../inc/oscillator.h"
-#include "../inc/iir_filter.h"
 
 int pos1=0,pos2=0;
 int n1 = 4, n2 = 4;
@@ -62,7 +63,7 @@ float b_hpf_tst[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E-
      return out;
  }
 
- int test_iir_filter() {
+ int test_cheby_iir_filter() {
 // 	int fs = 48000;
 // 	int filter_len = 48;025
 // 	float coeffs[filter_len];

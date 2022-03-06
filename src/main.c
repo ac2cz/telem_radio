@@ -6,12 +6,14 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../inc/audio_processor.h"
 #include "../inc/config.h"
 #include "../inc/audio_tools.h"
+#include "../inc/cheby_iir_filter.h"
 #include "../inc/fir_filter.h"
-#include "../inc/iir_filter.h"
+#include "../inc/IIRFilterCode.h"
 #include "../inc/oscillator.h"
 
 int run_tests = false;
@@ -21,7 +23,8 @@ int run_self_test() {
 	int fail = 0;
 	printf("\nRunning Self Test..\n");
 	//rc = test_oscillator();
-	//rc = test_iir_filter();
+	rc = test_iir_filter();
+	exit(1);
 	rc = test_rs_encoder();
 	if (rc != 0) fail = 1;
 	rc = test_sync_word();

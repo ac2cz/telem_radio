@@ -20,8 +20,9 @@
 #include "../inc/config.h"
 #include "../inc/audio_processor.h"
 #include "../inc/audio_tools.h"
+#include "../inc/cheby_iir_filter.h"
 #include "../inc/fir_filter.h"
-#include "../inc/iir_filter.h"
+#include "../inc/IIRFilterCode.h"
 #include "../inc/telem_processor.h"
 #include "../inc/oscillator.h"
 //#include "../inc/TelemEncoding.h"
@@ -36,10 +37,6 @@ int sample_rate = 0;
 float decimate_filter_coeffs[DECIMATE_FILTER_LEN];
 float decimate_filter_xv[DECIMATE_FILTER_LEN];
 
-#define FIR_HIGHPASS_FILTER_LEN 480  // this is an experimental alternative to IIR, but does not worK!
-float fir_highpass_filter_coeffs[DECIMATE_FILTER_LEN];
-float fir_highpass_filter_xv[DECIMATE_FILTER_LEN];
-
 float interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 float interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
@@ -47,8 +44,13 @@ float interpolate_filter_xv[DECIMATE_FILTER_LEN];
 float duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
 float duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
+#define DUV_PRE_EMPHASIS_FILTER_LEN 96  // pre emphasize the bits so that they pass through the filter in a real radio
+float duv_pre_emphasis_filter_coeffs[DUV_PRE_EMPHASIS_FILTER_LEN];
+float duv_pre_emphasis_filter_xv[DUV_PRE_EMPHASIS_FILTER_LEN];
+
 float filtered_audio_buffer[PERIOD_SIZE];
-float decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation to 9600
+float decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation
+float hpf_decimated_audio_buffer[PERIOD_SIZE/4]; // the decimated audio samples after high pass filtering
 float interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000
 
 
@@ -60,6 +62,8 @@ float b_hpf_025[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E-
 // 4 pole cheb lpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
 float a_lpf_025[] = {1.504626E-05, 6.018503E-05, 9.027754E-05, 6.018503E-05, 1.504626E-05};
 float b_lpf_025[] = {1, 3.725385E+00, -5.226004E+00,  3.270902E+00,  -7.705239E-01};
+
+TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
 
 /* Telemetry modulator settings */
 int samples_per_duv_bit = 0; // this is calculated in the code.  For example it is 12000/200 = 60
@@ -184,9 +188,9 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	 * Now we high pass filter
 	 */
 	if (hpf) {
+		//FilterWithIIR(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
 			decimated_audio_buffer[i] = iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
-			//decimated_audio_buffer[i] = fir_filter(decimated_audio_buffer[i], fir_highpass_filter_coeffs, fir_highpass_filter_xv, FIR_HIGHPASS_FILTER_LEN);
 	}
 
 	/**
@@ -299,11 +303,21 @@ int  init_filters() {
 	if (rc != 0)
 		return rc;
 
-	/* FOR TESTING - DOES NOT WORK - FIR High Pass filter */
-	int fir_highpass_cutoff_freq = 300;
-	rc = gen_raised_cosine_coeffs(fir_highpass_filter_coeffs, sample_rate/DECIMATION_RATE, fir_highpass_cutoff_freq, 0.5f, FIR_HIGHPASS_FILTER_LEN);
-	if (rc != 0)
-		return rc;
+	/* High pass filter Cutoff 0.05 - 300Hz at 12k, 8 poles, 0.1dB ripple, 80dB stop band */
+	Elliptic8Pole300HzHighPassIIRCoeff = (TIIRCoeff) {
+				.a0 = {1.0,1.0,1.0,1.0},
+				.a1 = {-1.457958640999101440,-1.801882953872335770,-1.918405877608232670,-1.961807844116467030},
+				.a2 = { 0.553994469886055829, 0.847908435354810197, 0.948117893349852192, 0.986885245659999910},
+				.a3 = {0.0,0.0,0.0,0.0},
+				.a4 = {0.0,0.0,0.0,0.0},
+
+				.b0 = { 0.755468172841911700, 0.914802148903627210, 0.967898257208821722, 0.987349171838800999},
+				.b1 = {-1.501016765201333980,-1.820187091419891430,-1.930727256540441420,-1.973994746098864940},
+				.b2 = { 0.755468172841911700, 0.914802148903627210, 0.967898257208821722, 0.987349171838800999},
+				.b3 = {0.0,0.0,0.0,0.0},
+				.b4 = {0.0,0.0,0.0,0.0},
+				.NumSections = 4
+			};
 
 	/* Interpolation filter */
 	int interpolation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);

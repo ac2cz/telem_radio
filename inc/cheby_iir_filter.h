@@ -5,15 +5,15 @@
  *      Author: g0kla
  */
 
-#ifndef IIR_FILTER_H_
-#define IIR_FILTER_H_
+#ifndef CHEBY_IIR_FILTER_H_
+#define CHEBY_IIR_FILTER_H_
 
 /**
  * Take a float as part of a continuous stream of floats in a buffer and filter it.
  */
 float iir_filter(float in, float *a, float *b);
 
-int test_iir_filter();
+int test_cheby_iir_filter();
 
 
-#endif /* IIR_FILTER_H_ */
+#endif /* CHEBY_IIR_FILTER_H_ */
