@@ -10,11 +10,12 @@
 
 #define VERSION __DATE__ " - Version 0.2"
 
-#define VERBOSE 1
 #define DEBUG 1
+
+/* Global variables declared here.  They are defined in main.c */
+extern int verbose;
 
 #define true 1
 #define false 0
-
 
 #endif /* CONFIG_H_ */

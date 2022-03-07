@@ -31,7 +31,7 @@
 
 /* -- Macro Definitions
  * The do while(0) structure ensures that this code looks like a function and the
- * compiler will always check the code is valid.  But when DEBUG or VERBOSE are
+ * compiler will always check the code is valid.  But when DEBUG is
  * 0 the optimizer will remove the code
  *
  * The ##__VA_ARGS_ is supported by gcc and allows a list or not.
@@ -42,7 +42,10 @@
             do { if (DEBUG) fprintf(stdout, fmt, ##__VA_ARGS__); } while (0)
 
 #define verbose_print(fmt, ...) \
-            do { if (VERBOSE) fprintf(stdout, fmt, ##__VA_ARGS__); } while (0)
+            if (verbose) fprintf(stdout, fmt, ##__VA_ARGS__);
 
+#define error_print(fmt, ...) \
+            fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \
+                                __LINE__, __func__, ##__VA_ARGS__);
 
 #endif /* DEBUG_H_ */

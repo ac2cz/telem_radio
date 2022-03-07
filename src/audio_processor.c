@@ -484,19 +484,21 @@ int start_audio_processor (void) {
 	/* open a client connection to the JACK server */
 	client = jack_client_open (client_name, options, &status, server_name);
 	if (client == NULL) {
-		fprintf (stderr, "jack_client_open() failed, "
+		error_print ("jack_client_open() failed, "
 				"status = 0x%2.0x\n", status);
 		if (status & JackServerFailed) {
-			fprintf (stderr, "Unable to connect to JACK server\n");
+			error_print ("Unable to connect to JACK server\n");
 		}
 		exit (1);
 	}
 	if (status & JackServerStarted) {
-		fprintf (stderr, "JACK server started\n");
+		error_print ("JACK server started\n");
 	}
 	if (status & JackNameNotUnique) {
 		client_name = jack_get_client_name(client);
-		fprintf (stderr, "unique name `%s' assigned\n", client_name);
+		error_print ("unique name `%s' assigned\n", client_name);
+		error_print ("Exiting because we require a unique connection to the server\n");
+		exit (1);
 	}
 
 	/* tell the JACK server to call `process()' whenever
@@ -517,7 +519,7 @@ int start_audio_processor (void) {
 	/* now we know the sample rate then setup things that are dependent on that */
 	int rc = init_filters();
 	if (rc != 0) {
-		fprintf(stderr,"Error initializing filters");
+		error_print("Error initializing filters");
 		return rc;
 	}
 
@@ -531,14 +533,14 @@ int start_audio_processor (void) {
 			JackPortIsOutput, 0);
 
 	if ((input_port == NULL) || (output_port == NULL)) {
-		fprintf(stderr, "no more JACK ports available\n");
+		error_print("no more JACK ports available\n");
 		exit (1);
 	}
 
 	/* Tell the JACK server that we are ready to roll.  Our
 	 * process() callback will start running now. */
 	if (jack_activate (client)) {
-		fprintf (stderr, "cannot activate client");
+		error_print ("cannot activate client");
 		exit (1);
 	}
 
@@ -553,12 +555,12 @@ int start_audio_processor (void) {
 	ports = jack_get_ports (client, NULL, NULL,
 			JackPortIsPhysical|JackPortIsOutput);
 	if (ports == NULL) {
-		fprintf(stderr, "no physical capture ports\n");
+		error_print("no physical capture ports\n");
 		exit (1);
 	}
 
 	if (jack_connect (client, ports[0], jack_port_name (input_port))) {
-		fprintf (stderr, "cannot connect input ports\n");
+		error_print ("cannot connect input ports\n");
 	}
 
 	free (ports);
@@ -566,12 +568,12 @@ int start_audio_processor (void) {
 	ports = jack_get_ports (client, NULL, NULL,
 			JackPortIsPhysical|JackPortIsInput);
 	if (ports == NULL) {
-		fprintf(stderr, "no physical playback ports\n");
+		error_print("no physical playback ports\n");
 		exit (1);
 	}
 
 	if (jack_connect (client, jack_port_name (output_port), ports[0])) {
-		fprintf (stderr, "cannot connect output ports\n");
+		error_print ("cannot connect output ports\n");
 	}
 
 	free (ports);
@@ -600,39 +602,43 @@ int test_rs_encoder() {
 	//printf("Last Parity: %i \n",test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1]);
 	for (int i=0; i < DUV_PARITIES_LENGTH; i++) {
 		if (test_encoded_packet[DUV_DATA_LENGTH+i] != test_parities_check[i]) {
-			printf(" failed with parity %d\n", i);
+			verbose_print(" failed with parity %d\n", i);
 			fail = 1;
 		}
 	}
-	if (fail == 0)
-		printf("Pass\n");
-	else
-		printf("Fail\n");
+	if (fail == 0) {
+		printf(" Pass\n");
+	} else {
+		printf(" Fail\n");
+	}
 	return fail;
 }
 
 int test_sync_word() {
 	// test that the sync word is the last word in the packet
 	int fail = 0;
-	printf("TESTING Sync word .. %x %x\n",0xfa, (~0xfa) & 0x3ff);
+	printf("TESTING Sync word .. %x %x ",0xfa, (~0xfa) & 0x3ff);
 	init_rd_state();
 	encode_duv_telem_packet(test_packet, test_encoded_packet);
 
 	uint16_t word = test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH];
-	printf(" Sync Word is %x \n",word );
+	verbose_print(" Sync Word is %x \n",word );
 
 	if (word != 0x0fa && word != 0x305) // 0x305 is ~0xfa
 		fail = 1;
 
-	if (fail == 0)
-		printf(" Sync word .. Pass\n");
-	else
-		printf(" Sync word .. Fail\n");
+	if (fail == 0) {
+		printf(" Pass\n");
+	} else {
+		printf(" Fail\n");
+	}
+
 	return fail;
 }
 
 int test_get_next_bit() {
-	printf("TESTING get_next_bit .. \n");
+	printf("TESTING get_next_bit .. ");
+	verbose_print("\n");
 	/* reset the state of the modulator */
 	samples_sent_for_current_bit = 0;
 	bits_sent_for_current_word = 0;
@@ -661,14 +667,14 @@ int test_get_next_bit() {
 
 	for (int i=0; i < 50; i++) {
 		int b = get_next_bit();
-		printf(" %i",b);
+		verbose_print(" %i",b);
 
 		if (b != expected_result[i]) {
 			fail = 1;
-			printf("<-err ");
+			verbose_print("<-err ");
 		}
 		if ((i+1) % 10 == 0)
-			printf("\n");
+			verbose_print("\n");
 	}
 
 	// Now check the first and last parity bytes
@@ -684,15 +690,17 @@ int test_get_next_bit() {
 		fail = 1;
 	}
 
-	if (fail == 0)
-		printf(" get_next_bit .. Pass\n");
-	else
-		printf(" get_next_bit .. Fail\n");
+	if (fail == 0) {
+		printf(" Pass\n");
+	} else {
+		printf(" Fail\n");
+	}
 	return fail;
 }
 
 int test_modulate_bit() {
-	printf("TESTING modulate_bit .. \n");
+	printf("TESTING modulate_bit .. ");
+	verbose_print("\n");
 	int lpf = lpf_duv_bits;
 	lpf_duv_bits = false; // turn this off just for the test
 	int fail = 0;
@@ -733,7 +741,7 @@ int test_modulate_bit() {
 		double bit_audio_value = modulate_bit();
 		if ((i) % samples_per_duv_bit == 0) {
 			// first sample of bit
-			printf ("%.3f ",bit_audio_value);
+			verbose_print ("%.3f ",bit_audio_value);
 			double test_value = expected_result1[j] ? ONE_VALUE : ZERO_VALUE;
 			if (test_value != bit_audio_value) {
 				printf (" **start err ");
@@ -745,13 +753,13 @@ int test_modulate_bit() {
 			//printf ("%.3f ",i, bit_audio_value);
 			double test_value = expected_result1[j++] ? ONE_VALUE : ZERO_VALUE;
 			if (test_value != bit_audio_value) {
-				printf (" **end err, got '%.3f' ",bit_audio_value);
+				verbose_print (" **end err, got '%.3f' ",bit_audio_value);
 				fail = 1;
 			}
 		}
 
 	}
-	printf("\n");
+	verbose_print("\n");
 
 	uint16_t decode = 0;
 	int b = 9; // bit position in word
@@ -761,19 +769,19 @@ int test_modulate_bit() {
 	// test end of packet and start of next
 	for (int w=0; w < DUV_PACKET_LENGTH+5; w++) { // +5 so that we check first 5 words of next packet
 		if (w == DUV_PACKET_LENGTH) {
-			printf("end of packet\n\n");
+			verbose_print("end of packet\n\n");
 			check_expected_results = true; // now we check the first 40 bits of the second packet, inc sync word
 		}
-		printf ("w:%d ",w);
+		verbose_print ("w:%d ",w);
 		for (int i=0; i < 600; i++) { // 600 samples is a whole word
 			double bit_audio_value = modulate_bit();
 
 			if ((i) % samples_per_duv_bit == 0) {
-				printf ("%.3f ",bit_audio_value);
+				verbose_print ("%.3f ",bit_audio_value);
 				if (check_expected_results) {
 					double test_value = expected_result2[j++] ? ONE_VALUE : ZERO_VALUE;
 					if (test_value != bit_audio_value) {
-						printf (" **start err ");
+						verbose_print (" **start err ");
 						fail = 1;
 					}
 
@@ -785,33 +793,34 @@ int test_modulate_bit() {
 			}
 		}
 		unsigned char c = reverse_8b10b_lookup(decode);
-		printf(" 10b: %x 8b: %x",decode, c);
+		verbose_print(" 10b: %x 8b: %x",decode, c);
 		if (w < DUV_DATA_LENGTH) {
 			if (c != test_packet[w]) {
-				printf(" fail \n");
+				verbose_print(" fail \n");
 				fail = 1;
 			} else {
-				printf(" pass \n");
+				verbose_print(" pass \n");
 			}
 		} else if (w < DUV_PACKET_LENGTH) {
 			if (c != test_parities_check[w-DUV_DATA_LENGTH]) {
-				printf(" fail \n");
+				verbose_print(" fail \n");
 				fail = 1;
 			} else {
-				printf(" pass \n");
+				verbose_print(" pass \n");
 			}
 		} else {
-			printf("\n"); // these are checked bit by bit above
+			verbose_print("\n"); // these are checked bit by bit above
 		}
 		decode = 0;
 		b = 9;
 	}
 	lpf_duv_bits = lpf; // reset this after the test
 
-	if (fail == 0)
-		printf(" modulate_bit .. Pass\n");
-	else
-		printf(" modulate_bit .. Fail\n");
+	if (fail == 0) {
+		printf(" Pass\n");
+	} else {
+		printf(" Fail\n");
+	}
 	return fail;
 
 }

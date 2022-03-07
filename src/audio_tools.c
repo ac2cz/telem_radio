@@ -74,8 +74,8 @@
 		 // }
 	 }
 	 if (fail == 0)
-		 printf("Pass\n");
+		 printf(" Pass\n");
 	 else
-		 printf("Fail\n");
+		 printf(" Fail\n");
 	 return fail;
  }

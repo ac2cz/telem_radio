@@ -35,6 +35,9 @@
 #include "fir_filter.h"
 #include "oscillator.h"
 
+/* Global variables defined here.  They are declared in config.h */
+int verbose = false;
+
 int run_tests = false;
 int more_help = false;
 
@@ -65,6 +68,7 @@ void help(void) {
 			"Usage: telem_radio [OPTION]... \n"
 			"-h,--help      help\n"
 			"-t,--test      run self tests before starting the audio\n"
+			"-v,--verbose   print additional status and progress messages\n"
 	);
 	exit(0);
 }
@@ -75,10 +79,12 @@ int main(int argc, char *argv[]) {
 	{
 			{"help", 0, NULL, 'h'},
 			{"test", 0, NULL, 't'},
+			{"verbose", 0, NULL, 'v'},
 			{NULL, 0, NULL, 0},
 	};
 
-	more_help = 0;
+	more_help = false;
+
 	while (1) {
 		int c;
 		if ((c = getopt_long(argc, argv, "ht", long_option, NULL)) < 0)
@@ -89,6 +95,9 @@ int main(int argc, char *argv[]) {
 			break;
 		case 't':
 			run_tests = true;
+			break;
+		case 'v':
+			verbose = true;
 			break;
 		}
 	}
