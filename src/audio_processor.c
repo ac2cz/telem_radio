@@ -67,14 +67,10 @@ double interpolate_filter_xv[DECIMATE_FILTER_LEN];
 double duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
 double duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
-#define DUV_PRE_EMPHASIS_FILTER_LEN 96  // pre emphasize the bits so that they pass through the filter in a real radio
-double duv_pre_emphasis_filter_coeffs[DUV_PRE_EMPHASIS_FILTER_LEN];
-double duv_pre_emphasis_filter_xv[DUV_PRE_EMPHASIS_FILTER_LEN];
-
-double filtered_audio_buffer[PERIOD_SIZE];
-double decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation
+double filtered_audio_buffer[PERIOD_SIZE]; // the audio samples after they are filtered by the decimation filter
+double decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation and decimation filter
 double hpf_decimated_audio_buffer[PERIOD_SIZE/4]; // the decimated audio samples after high pass filtering
-double interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000
+double interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000 but before interpolation filter
 
 
 /* These are test filters from a lookup table.  We should design and implement optimal filters for final use */
@@ -87,6 +83,7 @@ double b_hpf_025[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E
 //float b_lpf_025[] = {1, 3.725385E+00, -5.226004E+00,  3.270902E+00,  -7.705239E-01};
 
 TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
+TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff;
 
 /* Telemetry modulator settings */
 int samples_per_duv_bit = 0; // this is calculated in the code.  For example it is 12000/200 = 60
@@ -95,7 +92,6 @@ int bits_sent_for_current_word = 0; // how many bits have we sent for the curren
 int words_sent_for_current_packet; // how many 10b words we have sent for the current packet
 int current_bit = 0; // the value of the current bit we are sending
 
-int decimate = true;
 int hpf = true; // filter the transponder audio
 int send_duv_telem = false;
 int send_test_telem = false; // send a 10101 test telem sequence
@@ -188,22 +184,16 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	//	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
 
 	for (int i = 0; i< nframes; i++) {
-		if (decimate) {
-			filtered_audio_buffer[i] = fir_filter((double)in[i], decimate_filter_coeffs, decimate_filter_xv, DECIMATE_FILTER_LEN);
-		} else {
-			filtered_audio_buffer[i] = (double)in[i];
-		}
+		filtered_audio_buffer[i] = fir_filter((double)in[i], decimate_filter_coeffs, decimate_filter_xv, DECIMATE_FILTER_LEN);
 	}
 
 	int decimate_count = 0;
 
-	if (decimate) {
-		for (int i = 0; i< nframes; i++) {
-			decimate_count++;
-			if (decimate_count == DECIMATION_RATE) {
-				decimate_count = 0;
-				decimated_audio_buffer[i/DECIMATION_RATE] = filtered_audio_buffer[i];
-			}
+	for (int i = 0; i< nframes; i++) {
+		decimate_count++;
+		if (decimate_count == DECIMATION_RATE) {
+			decimate_count = 0;
+			decimated_audio_buffer[i/DECIMATION_RATE] = filtered_audio_buffer[i];
 		}
 	}
 
@@ -211,9 +201,12 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	 * Now we high pass filter
 	 */
 	if (hpf) {
-		//FilterWithIIR(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
+		iir_filter(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
+	//	for (int i = 0; i< nframes/DECIMATION_RATE; i++)
+	//		hpf_decimated_audio_buffer[i] = cheby_iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
+	} else {
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
-			decimated_audio_buffer[i] = cheby_iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
+			hpf_decimated_audio_buffer[i] = decimated_audio_buffer[i];
 	}
 
 	/**
@@ -222,7 +215,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	if (send_duv_telem) {
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++) {
 			float bit_audio_value = modulate_bit();
-			decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
+			hpf_decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
 		}
 	}
 
@@ -232,25 +225,19 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	 * from the final signal.  We apply gain equal to DECIMATION_RATE to compensate for the loss of signal
 	 * from the inserted samples.
 	 */
-	if (decimate) {
-		float gain = (float)DECIMATION_RATE;
-		for (int i = 0; i < nframes; i++) {
-			decimate_count++;
-			if (decimate_count == DECIMATION_RATE) {
-				decimate_count = 0;
-				interpolated_audio_buffer[i] = gain * decimated_audio_buffer[i/DECIMATION_RATE];
-			} else
-				interpolated_audio_buffer[i] = 0.0f;
+	float gain = (float)DECIMATION_RATE;
+	for (int i = 0; i < nframes; i++) {
+		decimate_count++;
+		if (decimate_count == DECIMATION_RATE) {
+			decimate_count = 0;
+			interpolated_audio_buffer[i] = gain * hpf_decimated_audio_buffer[i/DECIMATION_RATE];
+		} else
+			interpolated_audio_buffer[i] = 0.0f;
 
-		}
-		/* Now filter out the duplications of the spectrum that interpolation introduces */
-		for (int i = 0; i< nframes; i++) {
-			out[i] = (float)fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
-		}
-	} else {
-		for (int i = 0; i< nframes; i++) {
-			out[i] = (float)filtered_audio_buffer[i];
-		}
+	}
+	/* Now filter out the duplications of the spectrum that interpolation introduces */
+	for (int i = 0; i< nframes; i++) {
+		out[i] = (float)fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
 	}
 
 	return out;
@@ -342,6 +329,38 @@ int  init_filters() {
 				.NumSections = 4
 			};
 
+//	/* High pass filter Cutoff 0.05 - 300Hz at 12k, 4 poles, 0.1dB ripple, 80dB stop band */
+//	Elliptic4Pole300HzHighPassIIRCoeff = (TIIRCoeff) {
+//		.a0 = {1.0,1.0},
+//				.a1 = {-1.632749182559936950,-1.902361314288061540},
+//				.a2 = {0.680318914944733955,0.928685994848813867},
+//				.a3 = {0.0,0.0},
+//				.a4 = {0.0,0.0},
+//
+//				.b0 = {0.828466075118585832,0.957801757196423798},
+//				.b1 = {-1.656135947267499240,-1.915443794744027710},
+//				.b2 = {0.828466075118585832,0.957801757196423798},
+//				.b3 = {0.0,0.0},
+//				.b4 = {0.0,0.0},
+//				.NumSections = 2
+//	};
+
+	/* High pass filter Cutoff 0.05 - 300Hz at 12k, 4 poles, 0.02dB ripple, 60dB stop band */
+	Elliptic4Pole300HzHighPassIIRCoeff = (TIIRCoeff) {
+		.a0 = {1.0,1.0},
+		.a1 = {-1.672069386975465260,-1.893899543708855940},
+		.a2 = {0.707257251879312099,0.919220780682049821},
+		.a3 = {0.0,0.0},
+		.a4 = {0.0,0.0},
+
+		.b0 = {0.845362532264354760,0.953385271211727114,},
+		.b1 = {-1.688601574326067830,-1.906349781967451530},
+		.b2 = {0.845362532264354760,0.953385271211727114},
+		.b3 = {0.0,0.0},
+		.b4 = {0.0,0.0},
+		.NumSections = 2
+	};
+
 	/* Interpolation filter */
 	int interpolation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
 	rc = gen_raised_cosine_coeffs(interpolate_filter_coeffs, sample_rate, interpolation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
@@ -360,7 +379,6 @@ char *help_str =
 		" (s)tatus   - display settings and status\n"
 		" (f)ilter   - Toggle high pass filter on/off\n"
 		" (l)ow pass filter   - Toggle bit low high pass filter on/off\n"
-		" (d)ecimate - Toggle decimation on/off\n"
 		" (t)elem    - Toggle DUV telemetry on/off\n"
 		" test       - DUV telem contains only 101010 on/off\n"
 		" tone       - Generate test tone\n"
@@ -382,12 +400,12 @@ void get_status() {
 	printf(" samples per DUV bit: %d\n", samples_per_duv_bit);
 	int rate = sample_rate/DECIMATION_RATE;
 	printf(" decimation factor: %d with audio loop sample rate %d\n",DECIMATION_RATE, rate);
-	print_status("Decimate", decimate);
+	printf(" test tone freq %d Hz\n",(int)test_tone_freq);
 	print_status("High Pass Filter", hpf);
 	print_status("Bit Low Pass Filter", lpf_duv_bits);
 	print_status("DUV Telemetry", send_duv_telem);
 	print_status("Test Telem", send_test_telem);
-	printf("Test tone freq %d Hz\n",(int)test_tone_freq);
+
 	print_status("Generate test tone", send_test_tone);
 	print_status("Measure input test tone", measure_test_tone);
 }
@@ -416,9 +434,6 @@ int cmd_console() {
 			} else if (strcmp(token, "low") == 0 || strcmp(token, "l") == 0) {
 				lpf_duv_bits = !lpf_duv_bits;
 				print_status("Bit Low Pass Filter", lpf_duv_bits);
-			} else if (strcmp(token, "decimate") == 0 || strcmp(token, "d") == 0) {
-				decimate = !decimate;
-				print_status("Decimate", decimate);
 			} else if (strcmp(token, "telem") == 0 || strcmp(token, "t") == 0) {
 				send_duv_telem = !send_duv_telem;
 				if (send_duv_telem == false) { // reset the modulator ready for next time

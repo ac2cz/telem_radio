@@ -40,13 +40,14 @@ int verbose = false;
 
 int run_tests = false;
 int more_help = false;
+int filter_test_num = 0;
 
 int run_self_test() {
 	int rc = 0;
 	int fail = 0;
 	printf("\nRunning Self Test..\n");
 	//rc = test_oscillator(); exit(1);
-	//rc = test_iir_filter(); exit(1);
+
 	rc = test_rs_encoder();    if (rc != 0) fail = 1;
 	rc = test_sync_word();     if (rc != 0) fail = 1;
 	rc = test_get_next_bit();  if (rc != 0) fail = 1;
@@ -60,15 +61,28 @@ int run_self_test() {
 	return rc;
 }
 
+int run_filter_test(int test_num) {
+	int rc = 1;
+	if (test_num == 1)
+		rc = test_iir_filter();
+	else {
+		error_print("Filter test %d does not exist.  Exiting", test_num);
+		exit(1);
+	}
+
+	return rc;
+}
+
 /**
  * Print this help if the -h or --help command line options are used
  */
 void help(void) {
 	printf(
 			"Usage: telem_radio [OPTION]... \n"
-			"-h,--help      help\n"
-			"-t,--test      run self tests before starting the audio\n"
-			"-v,--verbose   print additional status and progress messages\n"
+			"-h,--help                 help\n"
+			"-t,--test                 run self tests before starting the audio\n"
+			"-v,--verbose              print additional status and progress messages\n"
+			"-f1,--filter-test <num>   Run a test on filter 1, the high pass filter\n"
 	);
 	exit(0);
 }
@@ -80,23 +94,27 @@ int main(int argc, char *argv[]) {
 			{"help", 0, NULL, 'h'},
 			{"test", 0, NULL, 't'},
 			{"verbose", 0, NULL, 'v'},
+			{"filter-test", 1, NULL, 'f'},
 			{NULL, 0, NULL, 0},
 	};
 
-	more_help = false;
-
+	int err = 0;
 	while (1) {
 		int c;
-		if ((c = getopt_long(argc, argv, "ht", long_option, NULL)) < 0)
+		if ((c = getopt_long(argc, argv, "htvf:", long_option, NULL)) < 0)
 			break;
 		switch (c) {
-		case 'h':
+		case 'h': // help
 			more_help = true;
 			break;
-		case 't':
+		case 'f': // filter test
+			err = atoi(optarg);
+			filter_test_num = err >= 1 && err < 1024 ? err : 1;
+			break;
+		case 't': // self test
 			run_tests = true;
 			break;
-		case 'v':
+		case 'v': // verbose
 			verbose = true;
 			break;
 		}
@@ -110,6 +128,10 @@ int main(int argc, char *argv[]) {
 	verbose_print("Build: %s\n", VERSION);
 
 	int rc = 0;
+	if (filter_test_num) {
+		rc = run_filter_test(filter_test_num);
+		exit(rc);
+	}
 	if (run_tests) {
 		rc = run_self_test();
 		if (rc != 0)
