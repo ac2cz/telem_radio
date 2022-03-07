@@ -3,6 +3,20 @@
  *
  *  Created on: Feb 21, 2022
  *      Author: g0kla
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ *
  *  This is based on the client demo for jackd
  *
  *  This audio loop reads audio from the sound card, processes it and then writes it back to
@@ -13,25 +27,27 @@
  */
 
 
-
+/* Standard C lib includes */
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <iir_filter.h>
 #include <stdint.h>
 
+/* libraries */
 #include <jack/jack.h>
 
+/* telem_radio includes */
 #include "config.h"
 #include "audio_processor.h"
 #include "audio_tools.h"
 #include "cheby_iir_filter.h"
 #include "fir_filter.h"
-#include "IIRFilterCode.h"
 #include "telem_processor.h"
 #include "oscillator.h"
-//#include "../inc/TelemEncoding.h"
+//#include "TelemEncoding.h"
 
 jack_port_t *input_port;
 jack_port_t *output_port;
@@ -196,7 +212,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	if (hpf) {
 		//FilterWithIIR(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
-			decimated_audio_buffer[i] = iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
+			decimated_audio_buffer[i] = cheby_iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
 	}
 
 	/**

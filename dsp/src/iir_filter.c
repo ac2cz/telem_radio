@@ -1,20 +1,16 @@
 /*
  By Daniel Klostermann
  Iowa Hills Software, LLC  IowaHills.com
- If you find a problem, please leave a note at:
- http://www.iowahills.com/feedbackcomments.html
  May 1, 2016
 
- ShowMessage is a C++ Builder function, and it usage has been commented out.
- If you are using C++ Builder, include vcl.h for ShowMessage.
- Otherwise replace ShowMessage with something appropriate for your compiler.
+ Released as free software in Daniel's "Software Kit"
 
- See the FilterKitMain.cpp file for an example on how to use this code.
 */
 
 #include <math.h>
 #include <stdio.h>
-#include "IIRFilterCode.h"
+
+#include <iir_filter.h>
 #include "oscillator.h"
 #include "config.h"
 
@@ -23,7 +19,7 @@
 // It uses 2 sets of shift registers, RegX on the input side and RegY on the output side.
 // There are many ways to implement an IIR filter, some very good, and some extremely bad.
 // For numerical reasons, a Form 1 Biquad implementation is among the best.
-void FilterWithIIR(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, int NumSigPts)
+void iir_filter(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, int NumSigPts)
 {
  double y;
  int j, k;
@@ -31,10 +27,10 @@ void FilterWithIIR(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, i
  for(j=0; j<NumSigPts; j++)
   {
    k = 0;
-   y = SectCalc(j, k, Signal[j], IIRCoeff);
+   y = iir_sector_calc(j, k, Signal[j], IIRCoeff);
    for(k=1; k<IIRCoeff.NumSections; k++)
     {
-     y = SectCalc(j, k, y, IIRCoeff);
+     y = iir_sector_calc(j, k, y, IIRCoeff);
     }
    FilteredSignal[j] = y;
   }
@@ -42,9 +38,9 @@ void FilterWithIIR(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, i
 }
 //---------------------------------------------------------------------------
 
-// This gets used with the function above, FilterWithIIR()
+// This gets used with the function above, iir_filter()
 // Note the use of MaxRegVal to avoid a math overflow condition.
-double SectCalc(int j, int k, double x, TIIRCoeff IIRCoeff)
+double iir_sector_calc(int j, int k, double x, TIIRCoeff IIRCoeff)
 {
  double y, CenterTap;
  static double RegX1[ARRAY_DIM], RegX2[ARRAY_DIM], RegY1[ARRAY_DIM], RegY2[ARRAY_DIM], MaxRegVal;
@@ -146,7 +142,7 @@ int test_iir_filter() {
 	}
 
 	// Filter
-	FilterWithIIR(Elliptic8Pole300HzHighPassIIRCoeff, buffer, buffer2, len);
+	iir_filter(Elliptic8Pole300HzHighPassIIRCoeff, buffer, buffer2, len);
 
 	for (int n=0; n< len; n++) {
 		printf("%f\n",buffer2[n]);

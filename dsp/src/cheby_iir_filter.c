@@ -4,6 +4,19 @@
  *  Created on: Feb 23, 2022
  *      Author: g0kla
  *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ *
  *  This is an IIR filter implemented according to Ch 20 of the Engineers and Scientists Guide to DSP
  *  Note that the maximum number of poles in a Chebyshev filter is limited by the cutoff frequency.  For
  *  single precision the limit is aproximately as follows:
@@ -40,7 +53,7 @@ double b_hpf_tst[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E
   * Processes one input signal value and returns the next output signal
   * value.
   */
-double iir_filter(double in, double *a, double *b) {
+double cheby_iir_filter(double in, double *a, double *b) {
 	double out = a[0] * in;
 
      for (int j = 1; j <= n1; j++) {
@@ -92,7 +105,7 @@ double iir_filter(double in, double *a, double *b) {
  		buffer[n] = value + value2;
  		//printf("%f\n",buffer[n]);
  		// Filter
- 		buffer2[n] = iir_filter(buffer[n], a_hpf_tst, b_hpf_tst);
+ 		buffer2[n] = cheby_iir_filter(buffer[n], a_hpf_tst, b_hpf_tst);
  		printf("%f\n",buffer2[n]);
  	}
 

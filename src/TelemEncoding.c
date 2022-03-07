@@ -48,7 +48,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "../inc/TelemEncoding.h"
+
+#include "TelemEncoding.h"
 
 #ifndef NULL
 #define NULL ((void *)0)

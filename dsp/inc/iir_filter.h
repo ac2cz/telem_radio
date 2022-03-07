@@ -14,8 +14,8 @@ typedef struct {double a0[ARRAY_DIM]; double a1[ARRAY_DIM]; double a2[ARRAY_DIM]
                    int NumSections; } TIIRCoeff;
 
 
- void FilterWithIIR(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, int NumSigPts);
- double SectCalc(int j, int k, double x, TIIRCoeff IIRCoeff);
+ void iir_filter(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, int NumSigPts);
+ double iir_sector_calc(int j, int k, double x, TIIRCoeff IIRCoeff);
 
  int test_iir_filter();
 
