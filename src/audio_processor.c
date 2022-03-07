@@ -84,6 +84,7 @@ double b_hpf_025[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E
 
 TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
 TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff;
+TIIRStorage iir_hpf_store; // storage for the IIR High Pass filter
 
 /* Telemetry modulator settings */
 int samples_per_duv_bit = 0; // this is calculated in the code.  For example it is 12000/200 = 60
@@ -201,8 +202,9 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	 * Now we high pass filter
 	 */
 	if (hpf) {
-		iir_filter(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
-	//	for (int i = 0; i< nframes/DECIMATION_RATE; i++)
+	//	iir_filter_array(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
+		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
+			hpf_decimated_audio_buffer[i] = iir_filter(Elliptic8Pole300HzHighPassIIRCoeff,decimated_audio_buffer[i], &iir_hpf_store);
 	//		hpf_decimated_audio_buffer[i] = cheby_iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
 	} else {
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
@@ -312,6 +314,14 @@ int  init_filters() {
 	int rc = gen_raised_cosine_coeffs(decimate_filter_coeffs, sample_rate, decimation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	if (rc != 0)
 		return rc;
+
+	iir_hpf_store.MaxRegVal = 1.0E-12;
+	for(int i=0; i<ARRAY_DIM; i++) {
+		iir_hpf_store.RegX1[i] = 0.0;
+		iir_hpf_store.RegX2[i] = 0.0;
+		iir_hpf_store.RegY1[i] = 0.0;
+		iir_hpf_store.RegY2[i] = 0.0;
+	}
 
 	/* High pass filter Cutoff 0.05 - 300Hz at 12k, 8 poles, 0.1dB ripple, 80dB stop band */
 	Elliptic8Pole300HzHighPassIIRCoeff = (TIIRCoeff) {

@@ -1,9 +1,12 @@
 /*
- By Daniel Klostermann
+ Based on code By Daniel Klostermann
+ Released as free software in Daniel's "Software Kit"
  Iowa Hills Software, LLC  IowaHills.com
  May 1, 2016
 
- Released as free software in Daniel's "Software Kit"
+ Author: g0kla
+ 7 Mar 2022
+
 
 */
 
@@ -15,71 +18,136 @@
 #include "config.h"
 
 
+/* This gets used with the function below, iir_filter_array()
+ * Note the use of MaxRegVal to avoid a math overflow condition.
+ * Also note that this resets the registers for each array, so the
+ * calling function must apply a window or overlap-add the data.
+ * Otherwise the audio will have a buzz equal to the frequency that this
+ * is called!
+ */
+double iir_array_sector_calc(int j, int k, double x, TIIRCoeff IIRCoeff) {
+	double y, CenterTap;
+	static double RegX1[ARRAY_DIM], RegX2[ARRAY_DIM], RegY1[ARRAY_DIM], RegY2[ARRAY_DIM], MaxRegVal;
+	static int MessageShown = false;
+
+	// Zero the registers on the 1st call or on an overflow condition. The overflow limit used
+	// here is small for double variables, but a filter that reaches this threshold is broken.
+	if( (j == 0 && k == 0) || MaxRegVal > OVERFLOW_LIMIT) {
+		if(MaxRegVal > OVERFLOW_LIMIT && !MessageShown) {
+			printf("ERROR: Math Over Flow in IIR Section Calc. \nThe register values exceeded 1.0E20 \n");
+			MessageShown = true; // So this message doesn't get shown thousands of times.
+		}
+
+		MaxRegVal = 1.0E-12;
+		for(int i=0; i<ARRAY_DIM; i++) {
+			RegX1[i] = 0.0;
+			RegX2[i] = 0.0;
+			RegY1[i] = 0.0;
+			RegY2[i] = 0.0;
+		}
+	}
+
+	CenterTap = x * IIRCoeff.b0[k] + IIRCoeff.b1[k] * RegX1[k] + IIRCoeff.b2[k] * RegX2[k];
+	y = IIRCoeff.a0[k] * CenterTap - IIRCoeff.a1[k] * RegY1[k] - IIRCoeff.a2[k] * RegY2[k];
+
+	RegX2[k] = RegX1[k];
+	RegX1[k] = x;
+	RegY2[k] = RegY1[k];
+	RegY1[k] = y;
+
+	// MaxRegVal is used to prevent overflow.  Overflow seldom occurs, but will
+	// if the filter has faulty coefficients. MaxRegVal is usually less than 100.0
+	if( fabs(CenterTap)  > MaxRegVal ) MaxRegVal = fabs(CenterTap);
+	if( fabs(y)  > MaxRegVal ) MaxRegVal = fabs(y);
+	return(y);
+}
+
+//---------------------------------------------------------------------------
+
 // This code implements an IIR filter as a Form 1 Biquad.
 // It uses 2 sets of shift registers, RegX on the input side and RegY on the output side.
 // There are many ways to implement an IIR filter, some very good, and some extremely bad.
 // For numerical reasons, a Form 1 Biquad implementation is among the best.
-void iir_filter(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, int NumSigPts)
-{
- double y;
- int j, k;
+void iir_filter_array(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, int NumSigPts) {
+	double y;
+	int j, k;
 
- for(j=0; j<NumSigPts; j++)
-  {
-   k = 0;
-   y = iir_sector_calc(j, k, Signal[j], IIRCoeff);
-   for(k=1; k<IIRCoeff.NumSections; k++)
-    {
-     y = iir_sector_calc(j, k, y, IIRCoeff);
-    }
-   FilteredSignal[j] = y;
-  }
-
+	for(j=0; j<NumSigPts; j++) {
+		k = 0;
+		y = iir_array_sector_calc(j, k, Signal[j], IIRCoeff);
+		for(k=1; k<IIRCoeff.NumSections; k++) {
+			y = iir_array_sector_calc(j, k, y, IIRCoeff);
+		}
+		FilteredSignal[j] = y;
+	}
 }
+
 //---------------------------------------------------------------------------
 
-// This gets used with the function above, iir_filter()
+// This gets used with the function below, iir_filter()
 // Note the use of MaxRegVal to avoid a math overflow condition.
-double iir_sector_calc(int j, int k, double x, TIIRCoeff IIRCoeff)
-{
- double y, CenterTap;
- static double RegX1[ARRAY_DIM], RegX2[ARRAY_DIM], RegY1[ARRAY_DIM], RegY2[ARRAY_DIM], MaxRegVal;
- static int MessageShown = false;
+double iir_sector_calc(int j, int k, double x, TIIRCoeff IIRCoeff, TIIRStorage *store) {
+	double y, CenterTap;
+	static int MessageShown = false;
 
- // Zero the registers on the 1st call or on an overflow condition. The overflow limit used
- // here is small for double variables, but a filter that reaches this threshold is broken.
- if( (j == 0 && k == 0) || MaxRegVal > OVERFLOW_LIMIT)
-  {
-   if(MaxRegVal > OVERFLOW_LIMIT && !MessageShown)
-    {
-     printf("ERROR: Math Over Flow in IIR Section Calc. \nThe register values exceeded 1.0E20 \n");
-     MessageShown = true; // So this message doesn't get shown thousands of times.
-    }
+	// Zero the registers on an overflow condition. The overflow limit used
+	// here is small for double variables, but a filter that reaches this threshold is broken.
+	if(store->MaxRegVal > OVERFLOW_LIMIT) {
+		if(store->MaxRegVal > OVERFLOW_LIMIT && !MessageShown) {
+			printf("ERROR: Math Over Flow in IIR Section Calc. \nThe register values exceeded 1.0E20 \n");
+			MessageShown = true; // So this message doesn't get shown thousands of times.
+		}
 
-   MaxRegVal = 1.0E-12;
-   for(int i=0; i<ARRAY_DIM; i++)
-    {
-     RegX1[i] = 0.0;
-     RegX2[i] = 0.0;
-     RegY1[i] = 0.0;
-     RegY2[i] = 0.0;
-    }
-  }
+		store->MaxRegVal = 1.0E-12;
+		for(int i=0; i<ARRAY_DIM; i++) {
+			store->RegX1[i] = 0.0;
+			store->RegX2[i] = 0.0;
+			store->RegY1[i] = 0.0;
+			store->RegY2[i] = 0.0;
+		}
+	}
 
- CenterTap = x * IIRCoeff.b0[k] + IIRCoeff.b1[k] * RegX1[k] + IIRCoeff.b2[k] * RegX2[k];
- y = IIRCoeff.a0[k] * CenterTap - IIRCoeff.a1[k] * RegY1[k] - IIRCoeff.a2[k] * RegY2[k];
+	CenterTap = x * IIRCoeff.b0[k] + IIRCoeff.b1[k] * store->RegX1[k] + IIRCoeff.b2[k] * store->RegX2[k];
+	y = IIRCoeff.a0[k] * CenterTap - IIRCoeff.a1[k] * store->RegY1[k] - IIRCoeff.a2[k] * store->RegY2[k];
 
- RegX2[k] = RegX1[k];
- RegX1[k] = x;
- RegY2[k] = RegY1[k];
- RegY1[k] = y;
+	store->RegX2[k] = store->RegX1[k];
+	store->RegX1[k] = x;
+	store->RegY2[k] = store->RegY1[k];
+	store->RegY1[k] = y;
 
- // MaxRegVal is used to prevent overflow.  Overflow seldom occurs, but will
- // if the filter has faulty coefficients. MaxRegVal is usually less than 100.0
- if( fabs(CenterTap)  > MaxRegVal ) MaxRegVal = fabs(CenterTap);
- if( fabs(y)  > MaxRegVal ) MaxRegVal = fabs(y);
- return(y);
+	// MaxRegVal is used to prevent overflow.  Overflow seldom occurs, but will
+	// if the filter has faulty coefficients. MaxRegVal is usually less than 100.0
+	if( fabs(CenterTap)  > store->MaxRegVal ) store->MaxRegVal = fabs(CenterTap);
+	if( fabs(y)  > store->MaxRegVal ) store->MaxRegVal = fabs(y);
+	return(y);
 }
+
+//---------------------------------------------------------------------------
+
+/**
+ * This code implements an IIR filter as a Form 1 Biquad.
+ * It uses 2 sets of shift registers, RegX on the input side and RegY on the output side.
+ * The calling function is responsible for allocating the storage for the registers by
+ * declaring the TIIStorage struct and passing a pointer to it.
+ *
+ * There are many ways to implement an IIR filter, some very good, and some extremely bad.
+ * For numerical reasons, a Form 1 Biquad implementation is among the best.
+ */
+double iir_filter(TIIRCoeff IIRCoeff, double Signal, TIIRStorage *store) {
+	double y;
+	int j = 0;
+	int k;
+
+	k = 0;
+	y = iir_sector_calc(j, k, Signal, IIRCoeff, store);
+	for(k=1; k<IIRCoeff.NumSections; k++) {
+		y = iir_sector_calc(j, k, y, IIRCoeff, store);
+	}
+	return y;
+}
+
+//---------------------------------------------------------------------------
+
 
 int test_iir_filter() {
 	printf("Testing Elliptic IIR Filter\n");
@@ -142,7 +210,7 @@ int test_iir_filter() {
 	}
 
 	// Filter
-	iir_filter(Elliptic8Pole300HzHighPassIIRCoeff, buffer, buffer2, len);
+	iir_filter_array(Elliptic8Pole300HzHighPassIIRCoeff, buffer, buffer2, len);
 
 	for (int n=0; n< len; n++) {
 		printf("%f\n",buffer2[n]);
