@@ -2,12 +2,12 @@
 Amateur radio telemetry modulator and radio control program
 
 To build telem_radio clone this git repository to a local machine.  
-telem_radio uses the jack audio server.  Install jack with apt or the equivalent on you machine:
+telem_radio uses the jack audio server.  Install jack with apt or the equivalent on your machine:
 
-sudo apt install jackd
+sudo apt install jackd<br>
 sudo apt install libjack-dev
 
-cd to the Debug or Release directories and type.  
+cd to the Debug or Release directories and type:  
 make all
 
 This should build the executable.  You should then be able to run telem-radio -h and it will print usage.
