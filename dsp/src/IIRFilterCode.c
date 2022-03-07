@@ -14,9 +14,9 @@
 
 #include <math.h>
 #include <stdio.h>
-#include "../inc/IIRFilterCode.h"
-#include "../inc/oscillator.h"
-#include "../inc/config.h"
+#include "IIRFilterCode.h"
+#include "oscillator.h"
+#include "config.h"
 
 
 // This code implements an IIR filter as a Form 1 Biquad.
@@ -90,22 +90,24 @@ int test_iir_filter() {
 	int samples_per_sec = 12000;
 
 	// Cutoff 0.05 - 300Hz at 12k or 1200Hz at 48k
-	TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff, Elliptic8Pole300HzHighPassIIRCoeff;
+//	TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff;
+//
+//	Elliptic4Pole300HzHighPassIIRCoeff = (TIIRCoeff) {
+//		.a0 = {1.0,1.0},
+//		.a1 = {-1.632749182559936950,-1.902361314288061540},
+//		.a2 = {0.680318914944733955,0.928685994848813867},
+//		.a3 = {0.0,0.0},
+//		.a4 = {0.0,0.0},
+//
+//		.b0 = {0.828466075118585832,0.957801757196423798},
+//		.b1 = {-1.656135947267499240,-1.915443794744027710},
+//		.b2 = {0.828466075118585832,0.957801757196423798},
+//		.b3 = {0.0,0.0},
+//		.b4 = {0.0,0.0},
+//		.NumSections = 2
+//	};
 
-	Elliptic4Pole300HzHighPassIIRCoeff = (TIIRCoeff) {
-		.a0 = {1.0,1.0},
-		.a1 = {-1.632749182559936950,-1.902361314288061540},
-		.a2 = {0.680318914944733955,0.928685994848813867},
-		.a3 = {0.0,0.0},
-		.a4 = {0.0,0.0},
-
-		.b0 = {0.828466075118585832,0.957801757196423798},
-		.b1 = {-1.656135947267499240,-1.915443794744027710},
-		.b2 = {0.828466075118585832,0.957801757196423798},
-		.b3 = {0.0,0.0},
-		.b4 = {0.0,0.0},
-		.NumSections = 2
-	};
+	TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
 
 	Elliptic8Pole300HzHighPassIIRCoeff = (TIIRCoeff) {
 			.a0 = {1.0,1.0,1.0,1.0},
@@ -123,11 +125,11 @@ int test_iir_filter() {
 		};
 
 	int table_size = 9600;
-	float phase1 = 0, phase2 = 0, phase3 = 0;
-	float freq1 = 50.0f, freq2 = 2000.0f, freq3 = 200.0f;
+	double phase1 = 0, phase2 = 0, phase3 = 0;
+	double freq1 = 50.0f, freq2 = 2000.0f, freq3 = 200.0f;
 
 
-	float sin_tab[table_size];
+	double sin_tab[table_size];
 	int rc = gen_sin_table(sin_tab, table_size);
 
 	int len = 600;
@@ -144,7 +146,7 @@ int test_iir_filter() {
 	}
 
 	// Filter
-	FilterWithIIR(Elliptic4Pole300HzHighPassIIRCoeff, buffer, buffer2, len);
+	FilterWithIIR(Elliptic8Pole300HzHighPassIIRCoeff, buffer, buffer2, len);
 
 	for (int n=0; n< len; n++) {
 		printf("%f\n",buffer2[n]);

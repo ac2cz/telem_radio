@@ -3,7 +3,13 @@
  *
  *  Created on: Feb 21, 2022
  *      Author: g0kla
- * This is based on the simple client demo for jackd
+ *  This is based on the client demo for jackd
+ *
+ *  This audio loop reads audio from the sound card, processes it and then writes it back to
+ *  the sound card.  Internally the audio is stored as doubles for all the calculations.  It
+ *  is read and written to the sound card as floats.
+ *
+ *
  */
 
 
@@ -17,14 +23,14 @@
 
 #include <jack/jack.h>
 
-#include "../inc/config.h"
-#include "../inc/audio_processor.h"
-#include "../inc/audio_tools.h"
-#include "../inc/cheby_iir_filter.h"
-#include "../inc/fir_filter.h"
-#include "../inc/IIRFilterCode.h"
-#include "../inc/telem_processor.h"
-#include "../inc/oscillator.h"
+#include "config.h"
+#include "audio_processor.h"
+#include "audio_tools.h"
+#include "cheby_iir_filter.h"
+#include "fir_filter.h"
+#include "IIRFilterCode.h"
+#include "telem_processor.h"
+#include "oscillator.h"
 //#include "../inc/TelemEncoding.h"
 
 jack_port_t *input_port;
@@ -34,34 +40,34 @@ jack_client_t *client;
 int sample_rate = 0;
 #define DECIMATE_FILTER_LEN 480
 #define DECIMATION_RATE 4
-float decimate_filter_coeffs[DECIMATE_FILTER_LEN];
-float decimate_filter_xv[DECIMATE_FILTER_LEN];
+double decimate_filter_coeffs[DECIMATE_FILTER_LEN];
+double decimate_filter_xv[DECIMATE_FILTER_LEN];
 
-float interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
-float interpolate_filter_xv[DECIMATE_FILTER_LEN];
+double interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
+double interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
 #define DUV_BIT_FILTER_LEN 96  // this length seems to be critical 48 is too short.  128 does not work at all.
-float duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
-float duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
+double duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
+double duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
 #define DUV_PRE_EMPHASIS_FILTER_LEN 96  // pre emphasize the bits so that they pass through the filter in a real radio
-float duv_pre_emphasis_filter_coeffs[DUV_PRE_EMPHASIS_FILTER_LEN];
-float duv_pre_emphasis_filter_xv[DUV_PRE_EMPHASIS_FILTER_LEN];
+double duv_pre_emphasis_filter_coeffs[DUV_PRE_EMPHASIS_FILTER_LEN];
+double duv_pre_emphasis_filter_xv[DUV_PRE_EMPHASIS_FILTER_LEN];
 
-float filtered_audio_buffer[PERIOD_SIZE];
-float decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation
-float hpf_decimated_audio_buffer[PERIOD_SIZE/4]; // the decimated audio samples after high pass filtering
-float interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000
+double filtered_audio_buffer[PERIOD_SIZE];
+double decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation
+double hpf_decimated_audio_buffer[PERIOD_SIZE/4]; // the decimated audio samples after high pass filtering
+double interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000
 
 
 /* These are test filters from a lookup table.  We should design and implement optimal filters for final use */
 // 4 pole cheb hpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec or 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
-float a_hpf_025[] = {7.941874E-01, -3.176750E+00, 4.765125E+00, -3.176750E+00, 7.941874E-01};
-float b_hpf_025[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E-01};
+double a_hpf_025[] = {7.941874E-01, -3.176750E+00, 4.765125E+00, -3.176750E+00, 7.941874E-01};
+double b_hpf_025[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E-01};
 
-// 4 pole cheb lpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
-float a_lpf_025[] = {1.504626E-05, 6.018503E-05, 9.027754E-05, 6.018503E-05, 1.504626E-05};
-float b_lpf_025[] = {1, 3.725385E+00, -5.226004E+00,  3.270902E+00,  -7.705239E-01};
+//// 4 pole cheb lpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
+//float a_lpf_025[] = {1.504626E-05, 6.018503E-05, 9.027754E-05, 6.018503E-05, 1.504626E-05};
+//float b_lpf_025[] = {1, 3.725385E+00, -5.226004E+00,  3.270902E+00,  -7.705239E-01};
 
 TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
 
@@ -78,7 +84,7 @@ int send_duv_telem = false;
 int send_test_telem = false; // send a 10101 test telem sequence
 int send_test_tone = false; // output a steady tone for measurement of a sound card
 int measure_test_tone = false; // display the peak ampltude of a received tone to measure the sound card
-int lpf = true;  // filter the DUV telem bits
+int lpf_duv_bits = true;  // filter the DUV telem bits
 
 /* Test Type 1 packet with id 1.  This will look like Fox-1A in FoxTelem */
 unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
@@ -89,9 +95,9 @@ unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
 
 /* Test tone paramaters */
 #define OSC_TABLE_SIZE 9600
-float osc_phase = 0;
-float test_tone_freq = 5000.0f;
-float osc_sin_table[OSC_TABLE_SIZE];
+double osc_phase = 0;
+double test_tone_freq = 5000.0f;
+double osc_sin_table[OSC_TABLE_SIZE];
 
 //int position_in_packet = 0;
 int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
@@ -148,7 +154,7 @@ double modulate_bit() {
 	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
 	//	int bit_audio_value = current_bit ? 1 : 0;
 
-		if (lpf)
+		if (lpf_duv_bits)
 			bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
 	return bit_audio_value;
 }
@@ -166,9 +172,9 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 
 	for (int i = 0; i< nframes; i++) {
 		if (decimate) {
-			filtered_audio_buffer[i] = fir_filter(in[i], decimate_filter_coeffs, decimate_filter_xv, DECIMATE_FILTER_LEN);
+			filtered_audio_buffer[i] = fir_filter((double)in[i], decimate_filter_coeffs, decimate_filter_xv, DECIMATE_FILTER_LEN);
 		} else {
-			filtered_audio_buffer[i] = in[i];
+			filtered_audio_buffer[i] = (double)in[i];
 		}
 	}
 
@@ -222,11 +228,11 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 		}
 		/* Now filter out the duplications of the spectrum that interpolation introduces */
 		for (int i = 0; i< nframes; i++) {
-			out[i] = fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
+			out[i] = (float)fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
 		}
 	} else {
 		for (int i = 0; i< nframes; i++) {
-			out[i] = filtered_audio_buffer[i];
+			out[i] = (float)filtered_audio_buffer[i];
 		}
 	}
 
@@ -236,7 +242,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 int measurement_loops = 0;
 #define LOOPS_PER_MEASUREMENT 500 // so measure once per 5 sec
 int measurements = 0;
-float peak_value = 0.0f;
+double peak_value = 0.0f;
 /**
  * The process callback for this JACK application is called in a
  * special realtime thread once for each audio cycle.
@@ -253,7 +259,7 @@ int process (jack_nframes_t nframes, void *arg) {
 
 	if (send_test_tone) {
 		for (int i=0; i < nframes; i++) {
-			float value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
+			double value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
 			out[i] = 0.2 * value;
 		}
 	} else if (measure_test_tone) {
@@ -361,7 +367,7 @@ void get_status() {
 	printf(" decimation factor: %d with audio loop sample rate %d\n",DECIMATION_RATE, rate);
 	print_status("Decimate", decimate);
 	print_status("High Pass Filter", hpf);
-	print_status("Bit Low Pass Filter", lpf);
+	print_status("Bit Low Pass Filter", lpf_duv_bits);
 	print_status("DUV Telemetry", send_duv_telem);
 	print_status("Test Telem", send_test_telem);
 	printf("Test tone freq %d Hz\n",(int)test_tone_freq);
@@ -391,8 +397,8 @@ int cmd_console() {
 				hpf = !hpf;
 				print_status("High Pass Filter", hpf);
 			} else if (strcmp(token, "low") == 0 || strcmp(token, "l") == 0) {
-				lpf = !lpf;
-				print_status("Bit Low Pass Filter", lpf);
+				lpf_duv_bits = !lpf_duv_bits;
+				print_status("Bit Low Pass Filter", lpf_duv_bits);
 			} else if (strcmp(token, "decimate") == 0 || strcmp(token, "d") == 0) {
 				decimate = !decimate;
 				print_status("Decimate", decimate);
@@ -670,6 +676,8 @@ int test_get_next_bit() {
 
 int test_modulate_bit() {
 	printf("TESTING modulate_bit .. \n");
+	int lpf = lpf_duv_bits;
+	lpf_duv_bits = false; // turn this off just for the test
 	int fail = 0;
 	int expected_result1[] = {
 			0,0,1,1,1,1,1,0,1,0,  // the sync word 0xfa
@@ -696,15 +704,14 @@ int test_modulate_bit() {
 	sample_rate = 48000;
 	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
 
-
 	encode_duv_telem_packet(test_packet, test_encoded_packet);
 
 	int j=0;
 
-
 	// Start of transmission test
-	//double bit_audio_value;
-	/* Run for whole first word, the sync word and check that the first and last sample of each bit is correct */
+
+	/* Run for whole first word, the sync word and check that the first and last sample of each bit is correct
+	 * This is 600 bits */
 	for (int i=0; i < 600; i++) {
 		double bit_audio_value = modulate_bit();
 		if ((i) % samples_per_duv_bit == 0) {
@@ -782,6 +789,7 @@ int test_modulate_bit() {
 		decode = 0;
 		b = 9;
 	}
+	lpf_duv_bits = lpf; // reset this after the test
 
 	if (fail == 0)
 		printf(" modulate_bit .. Pass\n");

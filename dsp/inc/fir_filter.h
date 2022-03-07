@@ -14,13 +14,13 @@
  * intermediate calculations.  xv is the same length as the coefficients.
  *
  */
-float fir_filter(float in, float *coeffs, float *xv, int len);
+double fir_filter(double in, double *coeffs, double *xv, int len);
 
 /**
  * Generate a raised cosine filter kernel and return the result in coeffs.  The caller is responsible
  * for allocating the needed space for the array.
  */
-int gen_raised_cosine_coeffs(float * coeffs, float sampleRate, float freq, float alpha, int len);
+int gen_raised_cosine_coeffs(double * coeffs, double sampleRate, double freq, double alpha, int len);
 
 int test_fir_filter();
 

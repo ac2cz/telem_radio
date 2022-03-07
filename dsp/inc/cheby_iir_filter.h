@@ -11,7 +11,7 @@
 /**
  * Take a float as part of a continuous stream of floats in a buffer and filter it.
  */
-float iir_filter(float in, float *a, float *b);
+double iir_filter(double in, double *a, double *b);
 
 int test_cheby_iir_filter();
 

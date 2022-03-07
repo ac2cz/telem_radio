@@ -13,15 +13,15 @@
  * The caller must keep track of the current phase, so it is passed by reference.  The
  * caller should generate a sine table once and pass it in to each call,
  */
-float nextSample(float *phase, float frequency, int samples_per_second, float *sin_table, int table_size);
+double nextSample(double *phase, double frequency, int samples_per_second, double *sin_table, int table_size);
 
 /**
  * Generate a sine lookup table to reduce the processing required for the oscillator.  The table size
  * is supplied and the lookup table is returned.  The caller is responsible for allocating the needed
  * space.
  */
-int gen_sin_table(float * sin_table, int table_size);
-int gen_cos_table(float * cos_table, int table_size);
+int gen_sin_table(double * sin_table, int table_size);
+int gen_cos_table(double * cos_table, int table_size);
 
 int test_oscillator();
 
