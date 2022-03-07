@@ -8,7 +8,10 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#define VERSION __DATE__ " - Version 0.1"
+#define VERSION __DATE__ " - Version 0.2"
+
+#define VERBOSE 1
+#define DEBUG 1
 
 #define true 1
 #define false 0

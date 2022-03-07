@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "oscillator.h"
+#include "debug.h"
 
 /**
  * Processes one float sample through an FIR filter.  The caller is responsible
@@ -47,7 +48,7 @@ double fir_filter(double in, double *coeffs, double *xv, int len) {
  * for allocating the needed space for the array.
  */
 int gen_raised_cosine_coeffs(double *coeffs, double sampleRate, double freq, double alpha, int len) {
-	printf("  Generating Raised Cosine Filter Sample Rate: %d Freq:%d Alpha:%f Len:%d\n", (int)sampleRate, (int)freq, alpha, len);
+	debug_print("  Generating Raised Cosine Filter Sample Rate: %d Freq:%d Alpha:%f Len:%d\n", (int)sampleRate, (int)freq, alpha, len);
 	int M = len-1;
 	double Fc = freq/sampleRate;
 

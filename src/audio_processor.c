@@ -41,6 +41,7 @@
 
 /* telem_radio includes */
 #include "config.h"
+#include "debug.h"
 #include "audio_processor.h"
 #include "audio_tools.h"
 #include "cheby_iir_filter.h"
@@ -317,7 +318,7 @@ void jack_shutdown (void *arg) {
 }
 
 int  init_filters() {
-	printf("Generating filters ..\n");
+	verbose_print("Generating filters ..\n");
 
 	/* Decimation filter */
 	int decimation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);

@@ -26,9 +26,10 @@
 #include <stdlib.h>
 #include <getopt.h>
 
+#include "config.h"
+#include "debug.h"
 #include "iir_filter.h"
 #include "audio_processor.h"
-#include "config.h"
 #include "audio_tools.h"
 #include "cheby_iir_filter.h"
 #include "fir_filter.h"
@@ -97,7 +98,7 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 	printf("TELEM Radio Platform\n");
-	printf("Build: %s\n", VERSION);
+	verbose_print("Build: %s\n", VERSION);
 
 	int rc = 0;
 	if (run_tests) {
