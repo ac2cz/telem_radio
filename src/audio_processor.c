@@ -35,6 +35,7 @@
 #include <assert.h>
 #include <iir_filter.h>
 #include <stdint.h>
+#include <time.h>
 
 /* libraries */
 #include <jack/jack.h>
@@ -54,6 +55,14 @@ jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
 
+// Performance timing variables
+clock_t start, end;
+double cpu_time_used;
+int loops_timed = 0;
+double total_cpu_time_used;
+#define NUMBER_OF_LOOPS_TO_TIME 1000
+
+// audio filter variables
 int sample_rate = 0;
 #define DECIMATE_FILTER_LEN 480
 #define DECIMATION_RATE 4
@@ -257,6 +266,7 @@ double peak_value = 0.0f;
  *
  */
 int process (jack_nframes_t nframes, void *arg) {
+	start = clock();
 	assert(nframes == PERIOD_SIZE);
 	jack_default_audio_sample_t *in, *out;
 
@@ -294,7 +304,17 @@ int process (jack_nframes_t nframes, void *arg) {
 		 */
 		audio_loop(in, out, nframes);
 	}
-
+	end = clock();
+	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	if (cpu_time_used > 0.01)
+		debug_print("WARNING: Loop ran for: %f secs\n",cpu_time_used);
+	loops_timed++;
+	total_cpu_time_used += cpu_time_used;
+	if (loops_timed > NUMBER_OF_LOOPS_TO_TIME) {
+		loops_timed = 0;
+		verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/NUMBER_OF_LOOPS_TO_TIME);
+		total_cpu_time_used = 0;
+	}
 	return 0;
 }
 
