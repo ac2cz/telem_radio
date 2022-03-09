@@ -8,11 +8,13 @@
 #ifndef AUDIO_PROCESSOR_H_
 #define AUDIO_PROCESSOR_H_
 
+#include <jack/jack.h>
+
 /* the number of frames in each audio sample period.  This must match the period in ALSA */
 #define PERIOD_SIZE 480
 
-/* Start the modulator audio thread */
-int start_audio_processor (void);
+jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes);
+int cmd_console();
 
 int test_rs_encoder();
 int test_sync_word();

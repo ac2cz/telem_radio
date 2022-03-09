@@ -2,6 +2,7 @@
 
 export JACK_NO_AUDIO_RESERVATION=1
 jackd -P70 -p16 -t2000 -dalsa -dhw:1,0 -p480 -n3 -r48000 & 
+#jackd -P99 -p16 -t2000 -dalsa -dhw:1,0 -p480 -n5 -r48000 &
 #jackd -P70 -p16 -t2000 -dalsa -dhw:1,0 -p480 -n3 -r48000 -s &
 
 # Which translates to: run JACK with a realtime priority of 70 (-P70), use a port maximum of 16

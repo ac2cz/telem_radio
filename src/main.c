@@ -29,6 +29,7 @@
 #include "config.h"
 #include "debug.h"
 #include "iir_filter.h"
+#include "jack_audio.h"
 #include "audio_processor.h"
 #include "audio_tools.h"
 #include "cheby_iir_filter.h"
@@ -37,6 +38,7 @@
 
 /* Global variables defined here.  They are declared in config.h */
 int verbose = false;
+int sample_rate = 0;
 
 int run_tests = false;
 int more_help = false;
@@ -51,7 +53,7 @@ int run_self_test() {
 	rc = test_rs_encoder();    if (rc != 0) fail = 1;
 	rc = test_sync_word();     if (rc != 0) fail = 1;
 	rc = test_get_next_bit();  if (rc != 0) fail = 1;
-	rc = test_audio_tools();   if (rc != 0) fail = 1;
+//	rc = test_audio_tools();   if (rc != 0) fail = 1; // audio tools not currently used
 	rc = test_modulate_bit();  if (rc != 0) fail = 1;
 
 	if (fail == 0)
@@ -82,7 +84,7 @@ void help(void) {
 			"-h,--help                 help\n"
 			"-t,--test                 run self tests before starting the audio\n"
 			"-v,--verbose              print additional status and progress messages\n"
-			"-f1,--filter-test <num>   Run a test on filter 1, the high pass filter\n"
+			"-f,--filter-test <num>   Run a test on filter <num>, where 1 is the high pass filter\n"
 	);
 	exit(0);
 }
@@ -137,7 +139,7 @@ int main(int argc, char *argv[]) {
 		if (rc != 0)
     		exit(rc);
     }
-    rc = start_audio_processor();
+    rc = start_jack_audio_processor();
 
 	printf("Exiting TELEM radio platform ..");
 	return rc;

@@ -14,6 +14,7 @@
 
 /* Global variables declared here.  They are defined in main.c */
 extern int verbose;
+extern int sample_rate;
 
 #define true 1
 #define false 0
