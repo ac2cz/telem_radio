@@ -26,7 +26,6 @@
  *
  */
 
-
 /* Standard C lib includes */
 #include <stdio.h>
 #include <errno.h>
@@ -37,7 +36,7 @@
 #include <stdint.h>
 #include <time.h>
 
-/* libraries */
+/* Libraries */
 #include <jack/jack.h>
 
 /* telem_radio includes */
@@ -49,21 +48,20 @@
 #include "fir_filter.h"
 #include "telem_processor.h"
 #include "oscillator.h"
-//#include "TelemEncoding.h"
 
-jack_port_t *input_port;
-jack_port_t *output_port;
-jack_client_t *client;
+/* Test tone parameters */
+#define OSC_TABLE_SIZE 9600
+double osc_phase = 0;
+double test_tone_freq = 5000.0f;
+double osc_sin_table[OSC_TABLE_SIZE];
 
-// Performance timing variables
-clock_t start, end;
-double cpu_time_used;
-int loops_timed = 0;
-double total_cpu_time_used;
-#define LOOPS_TO_TIME 5.0  // every few seconds
+/* Tone measurement parameters */
+int measurement_loops = 0;
+#define LOOPS_PER_MEASUREMENT 500 // so measure once per 5 sec
+int measurements = 0;
+double peak_value = 0.0f;
 
 // audio filter variables
-int sample_rate = 0;
 #define DECIMATE_FILTER_LEN 480
 #define DECIMATION_RATE 4
 double decimate_filter_coeffs[DECIMATE_FILTER_LEN];
@@ -116,11 +114,6 @@ unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
 		0x47,0x76,0xff,0xe7,0x33,0xce,0xe2,0x81,0x29,0x78,0x80,0xf2,0x8e,0x01,0x04,0x01,0x01,0x01,0x17,0x38,
 		0xac,0x00,0x00,0x20};
 
-/* Test tone paramaters */
-#define OSC_TABLE_SIZE 9600
-double osc_phase = 0;
-double test_tone_freq = 5000.0f;
-double osc_sin_table[OSC_TABLE_SIZE];
 
 //int position_in_packet = 0;
 int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
@@ -143,7 +136,7 @@ int get_next_bit() {
 
 			// if we do nothing here then we keep sending the test packet in a loop
 
-			// this turns off telemetry so we only send 1 frame
+			// this turns off telemetry so we only send 1 frame, but need to make sure the state is reset
 		//	send_duv_telem = false;
 		//	first_packet_to_be_sent = true;
 		}
@@ -188,7 +181,7 @@ double modulate_bit() {
  * Currently this uses FIR decimation filters which will be replaced with a more efficient alternative
  *
  */
-jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
+jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
 
 	//	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
@@ -254,77 +247,42 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in,
 	return out;
 }
 
-int measurement_loops = 0;
-#define LOOPS_PER_MEASUREMENT 500 // so measure once per 5 sec
-int measurements = 0;
-double peak_value = 0.0f;
-/**
- * The process callback for this JACK application is called in a
- * special realtime thread once for each audio cycle.
- *
- * Each buffer contains 480 ALSA frames, specified when jackd was started
- *
- */
-int process (jack_nframes_t nframes, void *arg) {
-	start = clock();
-	assert(nframes == PERIOD_SIZE);
-	jack_default_audio_sample_t *in, *out;
-
-	in = jack_port_get_buffer (input_port, nframes);
-	out = jack_port_get_buffer (output_port, nframes);
-
+jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes) {
 	if (send_test_tone) {
-		for (int i=0; i < nframes; i++) {
-			double value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
-			out[i] = 0.2 * value;
-		}
-	} else if (measure_test_tone) {
-		for (int i=0; i < nframes; i++) {
-			//out[i] = 0; // silence the output, except this does not work if we were already receiving a tone?
-			out[i] = in[i];  // play what we are measuring
-			//printf("%f\n", in[i]);
+			for (int i=0; i < nframes; i++) {
+				double value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
+				out[i] = 0.2 * value;
+			}
+		} else if (measure_test_tone) {
+			for (int i=0; i < nframes; i++) {
+				//out[i] = 0; // silence the output, except this does not work if we were already receiving a tone?
+				out[i] = in[i];  // play what we are measuring
+				//printf("%f\n", in[i]);
 
-			if (in[i] > peak_value)  //////////// This compare does not WORK!!
-				peak_value = in[i];
+				if (in[i] > peak_value)  //////////// This compare does not WORK!!
+					peak_value = in[i];
 
-			measurements++;
+				measurements++;
 
+			}
+			measurement_loops++;
+			if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
+				printf("Peak over %d measurements: %f\n", measurements, peak_value);
+				measurement_loops = 0;
+				measurements = 0;
+				peak_value = 0;
+			}
+		} else {
+			/*
+			 * Now process the data in out buffer before we sent it to the radio
+			 * First we apply a high pass filter at 300Hz
+			 */
+			duv_audio_loop(in, out, nframes);
 		}
-		measurement_loops++;
-		if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
-			printf("Peak over %d measurements: %f\n", measurements, peak_value);
-			measurement_loops = 0;
-			measurements = 0;
-			peak_value = 0;
-		}
-	} else {
-		/*
-		 * Now process the data in out buffer before we sent it to the radio
-		 * First we apply a high pass filter at 300Hz
-		 */
-		audio_loop(in, out, nframes);
-	}
-	end = clock();
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	if (cpu_time_used > 0.01)
-		debug_print("WARNING: Loop ran for: %f secs\n",cpu_time_used);
-	loops_timed++;
-	total_cpu_time_used += cpu_time_used;
-	if (total_cpu_time_used > LOOPS_TO_TIME) {
-		verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
-		total_cpu_time_used = 0;
-		loops_timed = 0;
-	}
-	return 0;
+	return out;
 }
 
-/**
- * JACK calls this shutdown_callback if the server ever shuts down or
- * decides to disconnect the client.
- */
-void jack_shutdown (void *arg) {
-	exit (1);
-}
+
 
 int  init_filters() {
 	verbose_print("Generating filters ..\n");
@@ -438,9 +396,33 @@ void get_status() {
 
 	print_status("Generate test tone", send_test_tone);
 	print_status("Measure input test tone", measure_test_tone);
+	print_status("Verbose Output", verbose);
+}
+
+int init() {
+	// Init
+	/* Encode one test packet */
+	encode_duv_telem_packet(test_packet, test_encoded_packet);
+	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
+
+	/* now we know the sample rate then setup things that are dependent on that */
+	int rc = init_filters();
+	if (rc != 0) {
+		error_print("Error initializing filters\n");
+		return rc;
+	}
+
+	return 0;
 }
 
 int cmd_console() {
+
+	int rc = init();
+	if (rc != 0) {
+		error_print("Initialization error\n");
+		return rc;
+	}
+
 	printf("Type (q)uit to exit, or (h)help..\n\n");
 	size_t buffer_size = 32;
 	char *line;
@@ -478,6 +460,9 @@ int cmd_console() {
 			} else if (strcmp(token, "test") == 0) {
 				send_test_telem = !send_test_telem;
 				print_status("Test Telem", send_test_telem);
+			} else if (strcmp(token, "verbose") == 0|| strcmp(token, "v") == 0) {
+				verbose = !verbose;
+				print_status("Verbose Output", verbose);
 			} else if (strcmp(token, "measure") == 0) {
 				measure_test_tone = !measure_test_tone;
 				print_status("Measure test tone", measure_test_tone);
@@ -514,120 +499,6 @@ int cmd_console() {
 	printf("Stopping audio processor ..\n");
 
 	return 0;
-}
-
-int start_audio_processor (void) {
-	const char **ports;
-	const char *client_name = "simple";
-	const char *server_name = NULL;
-	jack_options_t options = JackNullOption;
-	jack_status_t status;
-
-	/* Encode one test packet */
-	encode_duv_telem_packet(test_packet, test_encoded_packet);
-
-	/* open a client connection to the JACK server */
-	client = jack_client_open (client_name, options, &status, server_name);
-	if (client == NULL) {
-		error_print ("jack_client_open() failed, "
-				"status = 0x%2.0x\n", status);
-		if (status & JackServerFailed) {
-			error_print ("Unable to connect to JACK server\n");
-		}
-		exit (1);
-	}
-	if (status & JackServerStarted) {
-		error_print ("JACK server started\n");
-	}
-	if (status & JackNameNotUnique) {
-		client_name = jack_get_client_name(client);
-		error_print ("unique name `%s' assigned\n", client_name);
-		error_print ("Exiting because we require a unique connection to the server\n");
-		exit (1);
-	}
-
-	/* tell the JACK server to call `process()' whenever
-	   there is work to be done.
-	 */
-	jack_set_process_callback (client, process, 0);
-
-	/* tell the JACK server to call `jack_shutdown()' if
-	   it ever shuts down, either entirely, or if it
-	   just decides to stop calling us.
-	 */
-	jack_on_shutdown (client, jack_shutdown, 0);
-
-	/* display the current sample rate */
-	sample_rate = jack_get_sample_rate (client);
-	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
-
-	/* now we know the sample rate then setup things that are dependent on that */
-	int rc = init_filters();
-	if (rc != 0) {
-		error_print("Error initializing filters");
-		return rc;
-	}
-
-
-	/* create two ports */
-	input_port = jack_port_register (client, "input",
-			JACK_DEFAULT_AUDIO_TYPE,
-			JackPortIsInput, 0);
-	output_port = jack_port_register (client, "output",
-			JACK_DEFAULT_AUDIO_TYPE,
-			JackPortIsOutput, 0);
-
-	if ((input_port == NULL) || (output_port == NULL)) {
-		error_print("no more JACK ports available\n");
-		exit (1);
-	}
-
-	/* Tell the JACK server that we are ready to roll.  Our
-	 * process() callback will start running now. */
-	if (jack_activate (client)) {
-		error_print ("cannot activate client");
-		exit (1);
-	}
-
-	/* Connect the ports.  You can't do this before the client is
-	 * activated, because we can't make connections to clients
-	 * that aren't running.  Note the confusing (but necessary)
-	 * orientation of the driver backend ports: playback ports are
-	 * "input" to the backend, and capture ports are "output" from
-	 * it.
-	 */
-
-	ports = jack_get_ports (client, NULL, NULL,
-			JackPortIsPhysical|JackPortIsOutput);
-	if (ports == NULL) {
-		error_print("no physical capture ports\n");
-		exit (1);
-	}
-
-	if (jack_connect (client, ports[0], jack_port_name (input_port))) {
-		error_print ("cannot connect input ports\n");
-	}
-
-	free (ports);
-
-	ports = jack_get_ports (client, NULL, NULL,
-			JackPortIsPhysical|JackPortIsInput);
-	if (ports == NULL) {
-		error_print("no physical playback ports\n");
-		exit (1);
-	}
-
-	if (jack_connect (client, jack_port_name (output_port), ports[0])) {
-		error_print ("cannot connect output ports\n");
-	}
-
-	free (ports);
-
-	/* keep running until stopped by the user */
-	rc = cmd_console();
-
-	jack_client_close (client);
-	return rc;
 }
 
 unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0x84,0x27,0x77,0x98,0xb5,0xf3,0x89,0xf1,

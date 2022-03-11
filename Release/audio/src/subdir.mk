@@ -4,23 +4,23 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../src/TelemEncoding.c \
-../src/main.c \
-../src/telem_processor.c 
+../audio/src/audio_processor.c \
+../audio/src/audio_tools.c \
+../audio/src/jack_audio.c 
 
 C_DEPS += \
-./src/TelemEncoding.d \
-./src/main.d \
-./src/telem_processor.d 
+./audio/src/audio_processor.d \
+./audio/src/audio_tools.d \
+./audio/src/jack_audio.d 
 
 OBJS += \
-./src/TelemEncoding.o \
-./src/main.o \
-./src/telem_processor.o 
+./audio/src/audio_processor.o \
+./audio/src/audio_tools.o \
+./audio/src/jack_audio.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
-src/%.o: ../src/%.c src/subdir.mk
+audio/src/%.o: ../audio/src/%.c audio/src/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
 	gcc -I../inc -I../dsp/inc -I../audio/inc -O3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
@@ -28,10 +28,10 @@ src/%.o: ../src/%.c src/subdir.mk
 	@echo ' '
 
 
-clean: clean-src
+clean: clean-audio-2f-src
 
-clean-src:
-	-$(RM) ./src/TelemEncoding.d ./src/TelemEncoding.o ./src/main.d ./src/main.o ./src/telem_processor.d ./src/telem_processor.o
+clean-audio-2f-src:
+	-$(RM) ./audio/src/audio_processor.d ./audio/src/audio_processor.o ./audio/src/audio_tools.d ./audio/src/audio_tools.o ./audio/src/jack_audio.d ./audio/src/jack_audio.o
 
-.PHONY: clean-src
+.PHONY: clean-audio-2f-src
 

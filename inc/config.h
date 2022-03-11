@@ -8,12 +8,13 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
-#define VERSION __DATE__ " - Version 0.2"
+#define VERSION __DATE__ " - Version 0.3"
 
 #define DEBUG 1
 
 /* Global variables declared here.  They are defined in main.c */
 extern int verbose;
+extern int sample_rate;
 
 #define true 1
 #define false 0
