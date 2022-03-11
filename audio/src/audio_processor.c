@@ -26,7 +26,6 @@
  *
  */
 
-
 /* Standard C lib includes */
 #include <stdio.h>
 #include <errno.h>
@@ -49,7 +48,6 @@
 #include "fir_filter.h"
 #include "telem_processor.h"
 #include "oscillator.h"
-//#include "TelemEncoding.h"
 
 /* Test tone parameters */
 #define OSC_TABLE_SIZE 9600
@@ -138,7 +136,7 @@ int get_next_bit() {
 
 			// if we do nothing here then we keep sending the test packet in a loop
 
-			// this turns off telemetry so we only send 1 frame
+			// this turns off telemetry so we only send 1 frame, but need to make sure the state is reset
 		//	send_duv_telem = false;
 		//	first_packet_to_be_sent = true;
 		}
@@ -462,7 +460,7 @@ int cmd_console() {
 			} else if (strcmp(token, "test") == 0) {
 				send_test_telem = !send_test_telem;
 				print_status("Test Telem", send_test_telem);
-			} if (strcmp(token, "verbose") == 0|| strcmp(token, "v") == 0) {
+			} else if (strcmp(token, "verbose") == 0|| strcmp(token, "v") == 0) {
 				verbose = !verbose;
 				print_status("Verbose Output", verbose);
 			} else if (strcmp(token, "measure") == 0) {
@@ -502,8 +500,6 @@ int cmd_console() {
 
 	return 0;
 }
-
-
 
 unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0x84,0x27,0x77,0x98,0xb5,0xf3,0x89,0xf1,
 		0xa4,0x84,0xba,0x50,0x3a,0x0f,0x16,0x01,0x62,0x1c,0xcd,0x9a,0x11,0x1a,0xf2,0xa7};
