@@ -90,17 +90,23 @@ int test_encode_packet() {
 	assert(sizeof(duv_payload_t) == 56);
 	assert(sizeof(duv_packet_t) == DUV_DATA_LENGTH);
 	duv_packet_t *packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data
+
 	// This is the same header as the test packet
 	packet->header.id = 1;
 	packet->header.epoch = 42;
 	packet->header.uptime = 6920;
 	packet->header.type = 1;
 
+//		packet->header.epoch = 0;
+//		packet->header.uptime = 0;
+//		packet->header.type = 0;
+
 	unsigned char *ptr;
 	ptr = (unsigned char*)packet;
 
-	for (int i=0; i<4;i++)
+	for (int i=0; i<4;i++) {
 		printf("Byte: %d %x\n",i,ptr[i]);
+	}
 
 	return fail;
 }
