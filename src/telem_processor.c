@@ -20,9 +20,12 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
+#include <assert.h>
 
+#include "debug.h"
 #include "telem_processor.h"
 #include "TelemEncoding.h"
 
@@ -72,6 +75,33 @@ int test_telem_encoder(unsigned char *packet, uint16_t *encoded_packet) {
 	// get the RS parities
 	for(int i=0;i< DUV_PARITIES_LENGTH;i++)
 		encoded_packet[j++] = parities[i];
+	return fail;
+}
+
+/**
+ * Generate a test packet by specifying the data
+ */
+int test_encode_packet() {
+	int fail = 1;
+	verbose_print("Packet header length: %i\n",(int)sizeof(duv_header_t))
+	verbose_print("Packet payload length: %i\n",(int)sizeof(duv_payload_t))
+	verbose_print("Packet structure length: %i\n",(int)sizeof(duv_packet_t))
+	assert(sizeof(duv_header_t) == 8);
+	assert(sizeof(duv_payload_t) == 56);
+	assert(sizeof(duv_packet_t) == DUV_DATA_LENGTH);
+	duv_packet_t *packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data
+	// This is the same header as the test packet
+	packet->header.id = 1;
+	packet->header.epoch = 42;
+	packet->header.uptime = 6920;
+	packet->header.type = 1;
+
+	unsigned char *ptr;
+	ptr = (unsigned char*)packet;
+
+	for (int i=0; i<4;i++)
+		printf("Byte: %d %x\n",i,ptr[i]);
+
 	return fail;
 }
 

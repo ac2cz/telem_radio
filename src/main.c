@@ -49,7 +49,7 @@ int run_self_test() {
 	int fail = 0;
 	printf("\nRunning Self Test..\n");
 	//rc = test_oscillator(); exit(1);
-
+	rc = test_encode_packet(); exit(0);
 	rc = test_rs_encoder();    if (rc != 0) fail = 1;
 	rc = test_sync_word();     if (rc != 0) fail = 1;
 	rc = test_get_next_bit();  if (rc != 0) fail = 1;

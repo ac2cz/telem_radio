@@ -8,6 +8,7 @@
 #define TELEM_PROCESSOR_C_
 
 #include <stdint.h>
+#include <duv_telem_layout.h>
 
 /* Store the values for the telemetry modulator */
 #define DUV_BPS 200
@@ -32,6 +33,7 @@ void init_rd_state();
 void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet);
 
 int test_telem_encoder();
+int test_encode_packet();
 unsigned char reverse_8b10b_lookup(uint16_t word);
 
 #endif /* TELEM_PROCESSOR_C_ */
