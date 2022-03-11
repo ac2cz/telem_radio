@@ -1,0 +1,17 @@
+#!/bin/bash
+
+## Stop the ntp service
+sudo service ntp stop
+
+## Stop the triggerhappy service
+sudo service triggerhappy stop
+
+## Stop the dbus service. Warning: this can cause unpredictable behaviour when running a desktop environment on the RPi
+sudo service dbus stop
+
+## Remount /dev/shm to prevent memory allocation errors
+sudo mount -o remount,size=128M /dev/shm
+
+
+
+
