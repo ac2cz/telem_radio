@@ -16,9 +16,9 @@
 jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes);
 int cmd_console();
 
-int test_rs_encoder();
-int test_sync_word();
-int test_get_next_bit();
+/*
+ * Test functions
+ */
 int test_modulate_bit();
 
 #endif /* AUDIO_PROCESSOR_H_ */

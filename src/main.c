@@ -22,15 +22,20 @@
  *
  */
 
+/* System include files */
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
 
+/* project include files */
 #include "config.h"
 #include "debug.h"
-#include "iir_filter.h"
 #include "jack_audio.h"
 #include "audio_processor.h"
+
+/* Included for self tests */
+#include "iir_filter.h"
+#include "telem_processor.h"
 #include "audio_tools.h"
 #include "cheby_iir_filter.h"
 #include "fir_filter.h"
@@ -39,37 +44,39 @@
 /* Global variables defined here.  They are declared in config.h */
 int verbose = false;
 int sample_rate = 0;
+unsigned short epoch = 0;
 
+/* local variables for this file */
 int run_tests = false;
 int more_help = false;
 int filter_test_num = 0;
 
 int run_self_test() {
-	int rc = 0;
-	int fail = 0;
+	int rc = EXIT_SUCCESS;
+	int fail = EXIT_SUCCESS;
 	printf("\nRunning Self Test..\n");
 	//rc = test_oscillator(); exit(1);
-	rc = test_encode_packet(); exit(0);
-	rc = test_rs_encoder();    if (rc != 0) fail = 1;
-	rc = test_sync_word();     if (rc != 0) fail = 1;
-	rc = test_get_next_bit();  if (rc != 0) fail = 1;
-//	rc = test_audio_tools();   if (rc != 0) fail = 1; // audio tools not currently used
-	rc = test_modulate_bit();  if (rc != 0) fail = 1;
+	rc = test_gather_duv_telemetry(); if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	rc = test_rs_encoder();    if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	rc = test_sync_word();     if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	rc = test_get_next_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	rc = test_modulate_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	//	rc = test_audio_tools();   if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE; // audio tools not currently used
 
-	if (fail == 0)
+	if (fail == EXIT_SUCCESS)
 		printf("All Tests Passed\n\n");
 	else
 		printf("Some Tests Failed\n\n");
-	return rc;
+	return fail;
 }
 
 int run_filter_test(int test_num) {
-	int rc = 1;
+	int rc = EXIT_FAILURE;
 	if (test_num == 1)
 		rc = test_iir_filter();
 	else {
 		error_print("Filter test %d does not exist.  Exiting", test_num);
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 
 	return rc;
@@ -82,11 +89,13 @@ void help(void) {
 	printf(
 			"Usage: telem_radio [OPTION]... \n"
 			"-h,--help                 help\n"
-			"-t,--test                 run self tests before starting the audio\n"
 			"-v,--verbose              print additional status and progress messages\n"
+#ifdef DEBUG
+			"-t,--test                 run self tests before starting the audio\n"
 			"-f,--filter-test <num>   Run a test on filter <num>, where 1 is the high pass filter\n"
+#endif
 	);
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
 int main(int argc, char *argv[]) {
@@ -129,16 +138,27 @@ int main(int argc, char *argv[]) {
 	printf("TELEM Radio Platform\n");
 	verbose_print("Build: %s\n", VERSION);
 
-	int rc = 0;
+#ifdef RASPBERRY_PI
+	debug_print("Running on a Raspberry PI");
+#endif
+#ifdef LINUX
+	debug_print("Running on Linux");
+#endif
+
+	int rc = EXIT_SUCCESS;
+
+#ifdef DEBUG
 	if (filter_test_num) {
 		rc = run_filter_test(filter_test_num);
 		exit(rc);
 	}
 	if (run_tests) {
 		rc = run_self_test();
-		if (rc != 0)
+		if (rc != EXIT_SUCCESS)
     		exit(rc);
     }
+#endif
+
     rc = start_jack_audio_processor();
 
 	printf("Exiting TELEM radio platform ..");

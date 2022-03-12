@@ -45,7 +45,7 @@
             if (verbose) fprintf(stdout, fmt, ##__VA_ARGS__);
 
 #define error_print(fmt, ...) \
-            fprintf(stderr, "%s:%d:%s(): " fmt, __FILE__, \
+            fprintf(stderr, "ERROR: %s:%d:%s(): " fmt, __FILE__, \
                                 __LINE__, __func__, ##__VA_ARGS__);
 
 #endif /* DEBUG_H_ */

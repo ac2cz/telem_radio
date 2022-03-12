@@ -9,14 +9,15 @@
 #define CONFIG_H_
 
 #define VERSION __DATE__ " - Version 0.3"
-
 #define DEBUG 1
-
-/* Global variables declared here.  They are defined in main.c */
-extern int verbose;
-extern int sample_rate;
-
 #define true 1
 #define false 0
+#define EPOCH_START_YEAR 2000
+
+#define SPACECRAFT_ID 1      /* This is the id placed in the header of each packet */
+
+/* Global variables declared here.  They are defined in main.c */
+extern int verbose;          /* set from command line switch or from the cmd console */
+extern int sample_rate;      /* sample rate used by the audio processor */
 
 #endif /* CONFIG_H_ */
