@@ -26,7 +26,7 @@ OBJS += \
 dsp/src/%.o: ../dsp/src/%.c dsp/src/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
-	gcc -DLINUX -I../inc -I../dsp/inc -I../audio/inc -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
+	gcc -DRASPBERRY_PI -I../inc -I../dsp/inc -I../audio/inc -O0 -g3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
 	@echo 'Finished building: $<'
 	@echo ' '
 

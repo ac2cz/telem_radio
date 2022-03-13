@@ -48,6 +48,17 @@
 #include "telem_processor.h"
 #include "oscillator.h"
 
+/* Forward function declarations */
+double modulate_bit();
+int init_bit_modulator();
+jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
+		jack_default_audio_sample_t *out, jack_nframes_t nframes);
+int init();
+int init_filters();
+void print_status(char *name, int status);
+void print_full_status();
+int cmd_console();
+
 /* Test tone parameters */
 #define OSC_TABLE_SIZE 9600
 double osc_phase = 0;
@@ -77,16 +88,6 @@ double filtered_audio_buffer[PERIOD_SIZE]; // the audio samples after they are f
 double decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation and decimation filter
 double hpf_decimated_audio_buffer[PERIOD_SIZE/4]; // the decimated audio samples after high pass filtering
 double interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000 but before interpolation filter
-
-
-/* These are test filters from a lookup table.  We should design and implement optimal filters for final use */
-// 4 pole cheb hpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec or 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
-double a_hpf_025[] = {7.941874E-01, -3.176750E+00, 4.765125E+00, -3.176750E+00, 7.941874E-01};
-double b_hpf_025[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E-01};
-
-//// 4 pole cheb lpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
-//float a_lpf_025[] = {1.504626E-05, 6.018503E-05, 9.027754E-05, 6.018503E-05, 1.504626E-05};
-//float b_lpf_025[] = {1, 3.725385E+00, -5.226004E+00,  3.270902E+00,  -7.705239E-01};
 
 TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
 TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff;
@@ -244,9 +245,30 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 	return out;
 }
 
+/*
+ * This initializes the audio processor and should be called when it is first started
+ */
+int init() {
+	// Init
+	/* Encode first packet */
+	int rc;
+	rc = init_telemetry_processor();
+	rc = init_bit_modulator();
 
+	/* now we know the sample rate then setup things that are dependent on that */
+	rc = init_filters();
+	if (rc != 0) {
+		error_print("Error initializing filters\n");
+		return rc;
+	}
 
-int  init_filters() {
+	return 0;
+}
+
+/*
+ * This is called at startup to populate the coefficients for digital filters
+ */
+int init_filters() {
 	verbose_print("Generating filters ..\n");
 
 	/* Decimation filter */
@@ -338,13 +360,18 @@ char *help_str =
 		" (q)uit     - Shutdown and exit\n\n";
 
 
-
+/*
+ * Print a status line to the console for a boolean variable
+ */
 void print_status(char *name, int status) {
 	char *val = status ? " ON " : " OFF";
 	printf(" %s : %s\n",val, name);
 }
 
-void get_status() {
+/*
+ * Print status for all paramaters to the console
+ */
+void print_full_status() {
 	printf("TELEM Radio status:\n");
 	printf(" audio engine sample rate: %" PRIu32 "\n", sample_rate);
 	printf(" samples per DUV bit: %d\n", samples_per_duv_bit);
@@ -361,23 +388,11 @@ void get_status() {
 	print_status("Verbose Output", verbose);
 }
 
-int init() {
-	// Init
-	/* Encode first packet */
-	int rc;
-	rc = init_telemetry_processor();
-	rc = init_bit_modulator();
-
-	/* now we know the sample rate then setup things that are dependent on that */
-	rc = init_filters();
-	if (rc != 0) {
-		error_print("Error initializing filters\n");
-		return rc;
-	}
-
-	return 0;
-}
-
+/*
+ * Start an interactive command console that allows the user to issue commands to the
+ * telem_radio platform.  This should only be attached for lab testing.
+ *
+ */
 int cmd_console() {
 
 	int rc = init();
@@ -443,7 +458,7 @@ int cmd_console() {
 				}
 
 			} else if (strcmp(token, "status") == 0 || strcmp(token, "s") == 0) {
-				get_status();
+				print_full_status();
 			} else if (strcmp(token, "help") == 0 || strcmp(token, "h") == 0) {
 				printf("%s\n",help_str);
 			} else if (strcmp(token, "quit") == 0 || strcmp(token, "q") == 0) {
@@ -458,6 +473,12 @@ int cmd_console() {
 
 	return 0;
 }
+
+/******************************************************************************
+ *
+ * TEST FUNCTIONS
+ *
+ ******************************************************************************/
 
 unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0x84,0x27,0x77,0x98,0xb5,0xf3,0x89,0xf1,
 		0xa4,0x84,0xba,0x50,0x3a,0x0f,0x16,0x01,0x62,0x1c,0xcd,0x9a,0x11,0x1a,0xf2,0xa7};

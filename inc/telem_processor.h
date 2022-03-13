@@ -18,13 +18,6 @@
 #define BITS_PER_10b_WORD 10
 
 /*
- * These values specify the strength of the telemetry.  They should be carefully calculated and set.
- * This should probably be in a configuration file.
- */
-#define ONE_VALUE 0.01
-#define ZERO_VALUE -0.01
-
-/*
  * Set the running disparity to zero.  This is called just once at startup,
  * but we may call it more than once if we are running test routines.
  */

@@ -8,6 +8,8 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+#include "debug.h"
+
 #define VERSION __DATE__ " - Version 0.3"
 #define DEBUG 1
 #define true 1

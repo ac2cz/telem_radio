@@ -131,7 +131,8 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 	unsigned int uptime = timeptr->tm_sec + timeptr->tm_min*60 + timeptr->tm_hour*60*60 + timeptr->tm_yday*24*60*60;
 
 	debug_print("\nEpoch: %d Uptime: %d Type: %d\n",epoch, uptime, type);
-	debug_print("Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
+	debug_print("Storing q"
+			"Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
 
 	/* Build the header */
 	packet->header.epoch = epoch;
@@ -237,7 +238,7 @@ int test_gather_duv_telemetry() {
 	duv_packet_t *packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data
 	fail = gather_duv_telemetry(type, packet);
 
-	if (fail == EXIT_FAILURE) {
+	if (fail == EXIT_SUCCESS) {
 		printf(" Pass\n");
 	} else {
 		printf(" Fail\n");
@@ -299,7 +300,7 @@ int test_rs_encoder() {
 	// Call the RS encoder without 8b10b encoding
 	test_telem_encoder(test_packet, encoded_packet);
 
-	// Now check the first and last parity bytes
+	// Now check the parity bytes
 	// First should be 0x19 -> 25
 	// Last is 0xa7 -> 167
 	//printf("First parity: %i \n",test_encoded_packet[DUV_DATA_LENGTH]);

@@ -1,14 +1,26 @@
 /*
- Based on code By Daniel Klostermann
- Released as free software in Daniel's "Software Kit"
- Iowa Hills Software, LLC  IowaHills.com
- May 1, 2016
-
- Author: g0kla
- 7 Mar 2022
-
-
-*/
+ * Based on code by Daniel Klostermann
+ * Released as free software in Daniel's "Software Kit"
+ * Iowa Hills Software, LLC  IowaHills.com
+ * May 1, 2016
+ *
+ * Author: g0kla
+ * 7 Mar 2022
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ *
+ */
 
 #include <math.h>
 #include <stdio.h>
@@ -16,7 +28,6 @@
 #include <iir_filter.h>
 #include "oscillator.h"
 #include "config.h"
-
 
 /* This gets used with the function below, iir_filter_array()
  * Note the use of MaxRegVal to avoid a math overflow condition.
@@ -146,8 +157,11 @@ double iir_filter(TIIRCoeff IIRCoeff, double Signal, TIIRStorage *store) {
 	return y;
 }
 
-//---------------------------------------------------------------------------
-
+/******************************************************************************
+ *
+ * TEST FUNCTIONS
+ *
+ ******************************************************************************/
 
 int test_iir_filter() {
 	printf("Testing Elliptic IIR Filter\n");
