@@ -40,9 +40,11 @@ int get_next_bit();
 
 /*
  * Initialize the telemetry processor ready to send telemetry.  This should be called
- * whenever the telemetry is stopped and restarted.
+ * whenever the telemetry is stopped and restarted.  Cleanup should be called when
+ * it is no longer needed
  */
 int init_telemetry_processor();
+void cleanup_telem_processor();
 
 /*
  * Self test functions

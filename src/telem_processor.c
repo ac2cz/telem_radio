@@ -36,13 +36,12 @@ int get_next_packet();
 
 /* Telemetry modulator settings */
 duv_packet_t *telem_packet;
-int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
+unsigned char parities[DUV_PARITIES_LENGTH];
 uint16_t encoded_packet[DUV_PACKET_LENGTH+1]; // includes space for SYNC WORD at the end.
+int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
 int bits_sent_for_current_word = 0; // how many bits have we sent for the current 10b word
 int words_sent_for_current_packet; // how many 10b words we have sent for the current packet
-
 int rd_state = 0; // 8b10b Encoder state, initialized once at startup
-unsigned char parities[DUV_PARITIES_LENGTH];
 
 void init_rd_state() {
 	rd_state = 0;
@@ -140,20 +139,20 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 
 	/* Read the sensors and populate the payload */
 
-//	int millideg;
-//	unsigned short systemp;
-//		FILE *thermal;
-//		int n;
-//
-//		thermal = fopen("/sys/class/thermal/thermal_zone0/temp","r");
-//		n = fscanf(thermal,"%d",&millideg);
-//		fclose(thermal);
-//		if (n == 0) error_print("Failed to read the CPU temperature\n");
-//		systemp = millideg / 100;
-//
-//		debug_print("CPU temperature is %u degrees C\n",systemp);
-//
-//		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
+	int millideg;
+	unsigned short systemp;
+		FILE *thermal;
+		int n;
+
+		thermal = fopen("/sys/class/thermal/thermal_zone0/temp","r");
+		n = fscanf(thermal,"%d",&millideg);
+		fclose(thermal);
+		if (n == 0) error_print("Failed to read the CPU temperature\n");
+		systemp = millideg / 100;
+
+		debug_print("CPU temperature is %f degrees C\n",systemp/10.0);
+
+		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
 
 #ifdef RASPBERRY_PI
 
@@ -368,8 +367,10 @@ int test_sync_word() {
 int test_get_next_bit() {
 	printf("TESTING get_next_bit .. ");
 	verbose_print("\n");
+
 	/* reset the state of the modulator */
 	init_telemetry_processor();
+	// but then set the test packet rather than the real telemetry that was captured
 
 	// Generate the first 40 bits of the test packet - the header
 	// First four bytes are: 0x51,0x01, 0x40, 0xd8
