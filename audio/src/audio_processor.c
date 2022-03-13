@@ -252,7 +252,6 @@ int init() {
 	// Init
 	/* Encode first packet */
 	int rc;
-	rc = init_telemetry_processor();
 	rc = init_bit_modulator();
 
 	/* now we know the sample rate then setup things that are dependent on that */

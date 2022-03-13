@@ -131,8 +131,7 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 	unsigned int uptime = timeptr->tm_sec + timeptr->tm_min*60 + timeptr->tm_hour*60*60 + timeptr->tm_yday*24*60*60;
 
 	debug_print("\nEpoch: %d Uptime: %d Type: %d\n",epoch, uptime, type);
-	debug_print("Storing q"
-			"Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
+	debug_print("Storing Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
 
 	/* Build the header */
 	packet->header.epoch = epoch;
@@ -140,12 +139,28 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 	packet->header.type = type;
 
 	/* Read the sensors and populate the payload */
+
+//	int millideg;
+//	unsigned short systemp;
+//		FILE *thermal;
+//		int n;
+//
+//		thermal = fopen("/sys/class/thermal/thermal_zone0/temp","r");
+//		n = fscanf(thermal,"%d",&millideg);
+//		fclose(thermal);
+//		if (n == 0) error_print("Failed to read the CPU temperature\n");
+//		systemp = millideg / 100;
+//
+//		debug_print("CPU temperature is %u degrees C\n",systemp);
+//
+//		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
+
 #ifdef RASPBERRY_PI
 
 #endif
 #ifdef LINUX
 	// Test values go here
-	packet->payload.pi_temperature = 42;
+
 	packet->payload.xruns = 1;
 	packet->payload.data0 = 0xDE;
 	packet->payload.data1 = 0xAD;
@@ -184,6 +199,13 @@ int init_telemetry_processor() {
 	init_rd_state();
 	int rc = get_next_packet();
 	return rc;
+}
+
+/*
+ * Call this to free any memory allocated by the telemetry processor
+ */
+void cleanup_telem_processor() {
+	free(telem_packet);
 }
 
 /******************************************************************************
@@ -237,6 +259,7 @@ int test_gather_duv_telemetry() {
 	int type = 1;
 	duv_packet_t *packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data
 	fail = gather_duv_telemetry(type, packet);
+	free(packet);
 
 	if (fail == EXIT_SUCCESS) {
 		printf(" Pass\n");
@@ -282,6 +305,7 @@ int test_encode_packet() {
 		}
 		verbose_print(" byte: %d %x\n",i,ptr[i]);
 	}
+	free(packet);
 	if (fail == EXIT_FAILURE) {
 		printf(" Pass\n");
 	} else {
@@ -393,6 +417,7 @@ int test_get_next_bit() {
 		fail = 1;
 	}
 
+	cleanup_telem_processor();
 	if (fail == 0) {
 		printf(" Pass\n");
 	} else {

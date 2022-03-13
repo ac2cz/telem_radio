@@ -17,9 +17,8 @@ typedef struct __attribute__((__packed__)) {
 } duv_header_t;
 
 typedef struct __attribute__((__packed__)) {
-	unsigned int pi_temperature :	8;
+	unsigned int pi_temperature :	16;
 	unsigned int xruns :	16;
-	unsigned int dummy :	8;
 	unsigned int data0 :	8;
 	unsigned int data1 :	8;
 	unsigned int data2 :	8;

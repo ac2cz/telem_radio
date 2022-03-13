@@ -159,7 +159,14 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
+	rc = init_telemetry_processor();
+	if (rc != EXIT_SUCCESS) {
+		error_print("FATAL. Could not initialize the telemetry processor.\n");
+		exit(rc);
+	}
     rc = start_jack_audio_processor();
+
+    cleanup_telem_processor();
 
 	printf("Exiting TELEM radio platform ..");
 	return rc;
