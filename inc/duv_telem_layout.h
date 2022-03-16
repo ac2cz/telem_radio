@@ -14,6 +14,10 @@ typedef struct __attribute__((__packed__)) {
 	unsigned int epoch :	16;
 	unsigned int uptime :	25;
 	unsigned int type :		4;
+	unsigned int extended_id :	5;
+	unsigned int safe_mode :	1;
+	unsigned int health_mode :	1;
+	unsigned int science_mode :	1;
 } duv_header_t;
 
 typedef struct __attribute__((__packed__)) {
@@ -35,7 +39,7 @@ typedef struct __attribute__((__packed__)) {
 	unsigned int pad10 :	32;
 	unsigned int pad11 :	32;
 	unsigned int pad12 :	32;
-	unsigned int pad13 :	16;
+	unsigned int pad13 :	8;
 } duv_payload_t;
 
 typedef struct __attribute__((__packed__)) {
