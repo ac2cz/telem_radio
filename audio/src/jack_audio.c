@@ -3,6 +3,20 @@
  *
  *  Created on: Mar 8, 2022
  *      Author: g0kla
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ *
  */
 
 #include <assert.h>
@@ -27,8 +41,6 @@ double total_cpu_time_used;
 #define LOOPS_TO_TIME 5.0  // every few seconds
 
 
-
-
 /**
  * JACK calls this shutdown_callback if the server ever shuts down or
  * decides to disconnect the client.
@@ -36,8 +48,6 @@ double total_cpu_time_used;
 void jack_shutdown (void *arg) {
 	exit (1);
 }
-
-
 
 /**
  * The process callback for this JACK application is called in a
@@ -81,7 +91,7 @@ int process_audio (jack_nframes_t nframes, void *arg) {
  */
 int start_jack_audio_processor (void) {
 	const char **ports;
-	const char *client_name = "simple";
+	const char *client_name = "telem_radio";
 	const char *server_name = NULL;
 	jack_options_t options = JackNullOption;
 	jack_status_t status;

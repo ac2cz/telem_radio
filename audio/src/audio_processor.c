@@ -34,7 +34,6 @@
 #include <assert.h>
 #include <iir_filter.h>
 #include <stdint.h>
-#include <time.h>
 
 /* Libraries */
 #include <jack/jack.h>
@@ -48,6 +47,17 @@
 #include "fir_filter.h"
 #include "telem_processor.h"
 #include "oscillator.h"
+
+/* Forward function declarations */
+double modulate_bit();
+int init_bit_modulator();
+jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
+		jack_default_audio_sample_t *out, jack_nframes_t nframes);
+int init();
+int init_filters();
+void print_status(char *name, int status);
+void print_full_status();
+int cmd_console();
 
 /* Test tone parameters */
 #define OSC_TABLE_SIZE 9600
@@ -79,16 +89,6 @@ double decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimat
 double hpf_decimated_audio_buffer[PERIOD_SIZE/4]; // the decimated audio samples after high pass filtering
 double interpolated_audio_buffer[PERIOD_SIZE]; // the audio samples after interpolation back to 48000 but before interpolation filter
 
-
-/* These are test filters from a lookup table.  We should design and implement optimal filters for final use */
-// 4 pole cheb hpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec or 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
-double a_hpf_025[] = {7.941874E-01, -3.176750E+00, 4.765125E+00, -3.176750E+00, 7.941874E-01};
-double b_hpf_025[] = {1, 3.538919E+00, -4.722213E+00,  2.814036E+00,  -6.318300E-01};
-
-//// 4 pole cheb lpf at fc = 0.025 = 1200Kz at 48k or 300Hz at 12000 samples per sec 240Hz at 9600  Ch 20 Eng and Sci guide to DSP
-//float a_lpf_025[] = {1.504626E-05, 6.018503E-05, 9.027754E-05, 6.018503E-05, 1.504626E-05};
-//float b_lpf_025[] = {1, 3.725385E+00, -5.226004E+00,  3.270902E+00,  -7.705239E-01};
-
 TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
 TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff;
 TIIRStorage iir_hpf_store; // storage for the IIR High Pass filter
@@ -96,10 +96,10 @@ TIIRStorage iir_hpf_store; // storage for the IIR High Pass filter
 /* Telemetry modulator settings */
 int samples_per_duv_bit = 0; // this is calculated in the code.  For example it is 12000/200 = 60
 int samples_sent_for_current_bit = 0; // how many samples have we sent for the current bit
-int bits_sent_for_current_word = 0; // how many bits have we sent for the current 10b word
-int words_sent_for_current_packet; // how many 10b words we have sent for the current packet
 int current_bit = 0; // the value of the current bit we are sending
+int starting_bit_modulator = true;
 
+/* User settings changeable from cmd console */
 int hpf = true; // filter the transponder audio
 int send_duv_telem = false;
 int send_test_telem = false; // send a 10101 test telem sequence
@@ -107,60 +107,15 @@ int send_test_tone = false; // output a steady tone for measurement of a sound c
 int measure_test_tone = false; // display the peak ampltude of a received tone to measure the sound card
 int lpf_duv_bits = true;  // filter the DUV telem bits
 
-/* Test Type 1 packet with id 1.  This will look like Fox-1A in FoxTelem */
-unsigned char test_packet[] = {0x51,0x01,0x40,0xd8,0x00,
-		0x10,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x10,
-		0x00,0x01,0x20,0x00,0x01,0x10,0x00,0x47,0x8f,0xf4,0x47,0x7f,0xf4,0x48,0x7f,0xf4,0x10,0x08,0x00,0x65,
-		0x47,0x76,0xff,0xe7,0x33,0xce,0xe2,0x81,0x29,0x78,0x80,0xf2,0x8e,0x01,0x04,0x01,0x01,0x01,0x17,0x38,
-		0xac,0x00,0x00,0x20};
 
-
-//int position_in_packet = 0;
-int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
-
-uint16_t test_encoded_packet[DUV_PACKET_LENGTH+1]; // includes space for SYNC WORD at the end.
-
-int get_next_bit() {
-	int current_bit = -1; // the first bit is set to be the sync word
-
-	if (bits_sent_for_current_word >= BITS_PER_10b_WORD) { // We are starting a new 10b word
-		bits_sent_for_current_word = 0;
-		if (first_packet_to_be_sent) {
-			first_packet_to_be_sent = false; // we have sent at least one word so this is no longer the start of a transmission
-		} else {
-			// we sent a word from this packet so increment the counter
-			words_sent_for_current_packet++;
-		}
-		if (words_sent_for_current_packet >= DUV_PACKET_LENGTH+1) { // We are ready for a new packet.  We have the sync word in the final word
-			words_sent_for_current_packet = 0;
-
-			// if we do nothing here then we keep sending the test packet in a loop
-
-			// this turns off telemetry so we only send 1 frame, but need to make sure the state is reset
-		//	send_duv_telem = false;
-		//	first_packet_to_be_sent = true;
-		}
-
-	}
-	// so get the value
-	/* If we are starting to transmit then send the sync word first */
-	uint16_t current_word = 0xfa;
-	if (!first_packet_to_be_sent) {
-		current_word = test_encoded_packet[words_sent_for_current_packet];
-	}
-	// we send most significant bit first of the 10 bit word
-	int shift_amt = 9 - bits_sent_for_current_word;
-	current_bit = ((current_word & 0x3ff) >> shift_amt)  & 0x01;
-
-	bits_sent_for_current_word++;
-	return current_bit;
-}
-
+/*
+ * Turn the bit stream into samples that can be fed into the audio loop
+ */
 double modulate_bit() {
-
-	if ((samples_sent_for_current_bit == 0 && bits_sent_for_current_word == 0 && words_sent_for_current_packet == 0 )||  // starting a new packet
+	if (starting_bit_modulator ||  // starting a new packet
 			(samples_sent_for_current_bit >= samples_per_duv_bit )) { // We are starting a new bit
 		samples_sent_for_current_bit = 0;
+		starting_bit_modulator = false;
 		if (send_test_telem)
 			current_bit = !current_bit; // TESTING - just toggle the bit to generate 200Hz tone
 		else
@@ -168,11 +123,19 @@ double modulate_bit() {
 	}
 	samples_sent_for_current_bit++;
 	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
-	//	int bit_audio_value = current_bit ? 1 : 0;
 
-		if (lpf_duv_bits)
-			bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
+	if (lpf_duv_bits)
+		bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
+
 	return bit_audio_value;
+}
+
+int init_bit_modulator() {
+	starting_bit_modulator = true;
+	current_bit = 0;
+	samples_sent_for_current_bit = 0;
+	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
+	return EXIT_SUCCESS;
 }
 
 /**
@@ -282,9 +245,29 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 	return out;
 }
 
+/*
+ * This initializes the audio processor and should be called when it is first started
+ */
+int init() {
+	// Init
+	/* Encode first packet */
+	int rc;
+	rc = init_bit_modulator();
 
+	/* now we know the sample rate then setup things that are dependent on that */
+	rc = init_filters();
+	if (rc != 0) {
+		error_print("Error initializing filters\n");
+		return rc;
+	}
 
-int  init_filters() {
+	return 0;
+}
+
+/*
+ * This is called at startup to populate the coefficients for digital filters
+ */
+int init_filters() {
 	verbose_print("Generating filters ..\n");
 
 	/* Decimation filter */
@@ -376,13 +359,18 @@ char *help_str =
 		" (q)uit     - Shutdown and exit\n\n";
 
 
-
+/*
+ * Print a status line to the console for a boolean variable
+ */
 void print_status(char *name, int status) {
 	char *val = status ? " ON " : " OFF";
 	printf(" %s : %s\n",val, name);
 }
 
-void get_status() {
+/*
+ * Print status for all paramaters to the console
+ */
+void print_full_status() {
 	printf("TELEM Radio status:\n");
 	printf(" audio engine sample rate: %" PRIu32 "\n", sample_rate);
 	printf(" samples per DUV bit: %d\n", samples_per_duv_bit);
@@ -399,22 +387,11 @@ void get_status() {
 	print_status("Verbose Output", verbose);
 }
 
-int init() {
-	// Init
-	/* Encode one test packet */
-	encode_duv_telem_packet(test_packet, test_encoded_packet);
-	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
-
-	/* now we know the sample rate then setup things that are dependent on that */
-	int rc = init_filters();
-	if (rc != 0) {
-		error_print("Error initializing filters\n");
-		return rc;
-	}
-
-	return 0;
-}
-
+/*
+ * Start an interactive command console that allows the user to issue commands to the
+ * telem_radio platform.  This should only be attached for lab testing.
+ *
+ */
 int cmd_console() {
 
 	int rc = init();
@@ -449,12 +426,7 @@ int cmd_console() {
 			} else if (strcmp(token, "telem") == 0 || strcmp(token, "t") == 0) {
 				send_duv_telem = !send_duv_telem;
 				if (send_duv_telem == false) { // reset the modulator ready for next time
-					send_duv_telem = false;
-					first_packet_to_be_sent = true;
 					samples_sent_for_current_bit = 0;
-					bits_sent_for_current_word = 0;
-					words_sent_for_current_packet = 0;
-					init_rd_state();
 				}
 				print_status("Telemetry", send_duv_telem);
 			} else if (strcmp(token, "test") == 0) {
@@ -485,7 +457,7 @@ int cmd_console() {
 				}
 
 			} else if (strcmp(token, "status") == 0 || strcmp(token, "s") == 0) {
-				get_status();
+				print_full_status();
 			} else if (strcmp(token, "help") == 0 || strcmp(token, "h") == 0) {
 				printf("%s\n",help_str);
 			} else if (strcmp(token, "quit") == 0 || strcmp(token, "q") == 0) {
@@ -501,118 +473,15 @@ int cmd_console() {
 	return 0;
 }
 
+/******************************************************************************
+ *
+ * TEST FUNCTIONS
+ *
+ ******************************************************************************/
+
 unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0x84,0x27,0x77,0x98,0xb5,0xf3,0x89,0xf1,
 		0xa4,0x84,0xba,0x50,0x3a,0x0f,0x16,0x01,0x62,0x1c,0xcd,0x9a,0x11,0x1a,0xf2,0xa7};
 
-int test_rs_encoder() {
-	int fail = 0;
-	printf("TESTING Rs Encoder .. ");
-	init_rd_state();
-	// Call the RS encoder without 8b10b encoding
-	test_telem_encoder(test_packet, test_encoded_packet);
-
-	// Now check the first and last parity bytes
-	// First should be 0x19 -> 25
-	// Last is 0xa7 -> 167
-	//printf("First parity: %i \n",test_encoded_packet[DUV_DATA_LENGTH]);
-	//printf("Last Parity: %i \n",test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1]);
-	for (int i=0; i < DUV_PARITIES_LENGTH; i++) {
-		if (test_encoded_packet[DUV_DATA_LENGTH+i] != test_parities_check[i]) {
-			verbose_print(" failed with parity %d\n", i);
-			fail = 1;
-		}
-	}
-	if (fail == 0) {
-		printf(" Pass\n");
-	} else {
-		printf(" Fail\n");
-	}
-	return fail;
-}
-
-int test_sync_word() {
-	// test that the sync word is the last word in the packet
-	int fail = 0;
-	printf("TESTING Sync word .. %x %x ",0xfa, (~0xfa) & 0x3ff);
-	init_rd_state();
-	encode_duv_telem_packet(test_packet, test_encoded_packet);
-
-	uint16_t word = test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH];
-	verbose_print(" Sync Word is %x \n",word );
-
-	if (word != 0x0fa && word != 0x305) // 0x305 is ~0xfa
-		fail = 1;
-
-	if (fail == 0) {
-		printf(" Pass\n");
-	} else {
-		printf(" Fail\n");
-	}
-
-	return fail;
-}
-
-int test_get_next_bit() {
-	printf("TESTING get_next_bit .. ");
-	verbose_print("\n");
-	/* reset the state of the modulator */
-	samples_sent_for_current_bit = 0;
-	bits_sent_for_current_word = 0;
-	words_sent_for_current_packet = 0;
-	init_rd_state();
-	// Generate the first 40 bits of the test packet - the header
-	// First four bytes are: 0x51,0x01, 0x40, 0xd8
-	// These should encode as 10b words:
-	//   0x235    10 0011 0101    565
-	//   0x1d4    01 1101 0100
-	//   0x675   110 0111 0101 - note this is 11 bit because we use bit 11 as the rd state change indicator.
-	//   0x0c6    00 1100 0110 - this is encoded with rd state 1
-	// The RD state changes when a word does not have the same number of 1s and 0s (+/-1)
-
-	int fail = 0;
-	int expected_result[] = {
-			0,0,1,1,1,1,1,0,1,0,  // the sync word 0xfa
-			1,0,0,0,1,1,0,1,0,1,
-			0,1,1,1,0,1,0,1,0,0,
-			1,0,0,1,1,1,0,1,0,1,
-			0,0,1,1,0,0,0,1,1,0};
-
-	encode_duv_telem_packet(test_packet, test_encoded_packet);
-	//	printf("%x %x %x\n",test_packet[0], test_packet[1], test_packet[2]);
-	//	printf("%x %x %x\n",test_encoded_packet[0], test_encoded_packet[1], test_encoded_packet[2]);
-
-	for (int i=0; i < 50; i++) {
-		int b = get_next_bit();
-		verbose_print(" %i",b);
-
-		if (b != expected_result[i]) {
-			fail = 1;
-			verbose_print("<-err ");
-		}
-		if ((i+1) % 10 == 0)
-			verbose_print("\n");
-	}
-
-	// Now check the first and last parity bytes
-	// First should be 0x19 -> encoded as 0x264
-	// Last is 0xa7 -> encoded as 0x7a
-	//	printf("First parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH] );
-	//	printf("Last Parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1] );
-
-	if (test_encoded_packet[DUV_DATA_LENGTH] != 0x264) {
-		fail = 1;
-	}
-	if (test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1] != 0x7a) {
-		fail = 1;
-	}
-
-	if (fail == 0) {
-		printf(" Pass\n");
-	} else {
-		printf(" Fail\n");
-	}
-	return fail;
-}
 
 int test_modulate_bit() {
 	printf("TESTING modulate_bit .. ");
@@ -635,21 +504,20 @@ int test_modulate_bit() {
 			0,0,1,1,0,0,0,1,1,0};
 
 	/* reset the state of the modulator */
-	first_packet_to_be_sent = true;
+	init_telemetry_processor();
 	samples_sent_for_current_bit = 0;
-	bits_sent_for_current_word = 0;
-	words_sent_for_current_packet = 0;
 	current_bit = 0;
 	init_rd_state();
 
 	sample_rate = 48000;
 	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
 
-	encode_duv_telem_packet(test_packet, test_encoded_packet);
+	unsigned char *test_packet = set_test_packet();
 
 	int j=0;
 
 	// Start of transmission test
+	//telem_packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data which is used as the second packet
 
 	/* Run for whole first word, the sync word and check that the first and last sample of each bit is correct
 	 * This is 600 bits */
@@ -660,7 +528,7 @@ int test_modulate_bit() {
 			verbose_print ("%.3f ",bit_audio_value);
 			double test_value = expected_result1[j] ? ONE_VALUE : ZERO_VALUE;
 			if (test_value != bit_audio_value) {
-				printf (" **start err ");
+				verbose_print (" **start err ");
 				fail = 1;
 			}
 		}
@@ -683,7 +551,7 @@ int test_modulate_bit() {
 	int bit = 0;
 	j = 0;
 	// test end of packet and start of next
-	for (int w=0; w < DUV_PACKET_LENGTH+5; w++) { // +5 so that we check first 5 words of next packet
+	for (int w=0; w < DUV_PACKET_LENGTH+1; w++) { // +1 so that we check sync word of packet
 		if (w == DUV_PACKET_LENGTH) {
 			verbose_print("end of packet\n\n");
 			check_expected_results = true; // now we check the first 40 bits of the second packet, inc sync word
