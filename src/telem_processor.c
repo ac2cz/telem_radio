@@ -141,19 +141,19 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 
 	int millideg;
 	unsigned short systemp;
-		FILE *thermal;
+		FILE *sys_file;
 		int n;
 
-		thermal = fopen("/sys/class/thermal/thermal_zone0/temp","r");
-		n = fscanf(thermal,"%d",&millideg);
-		fclose(thermal);
+		sys_file = fopen("/sys/class/thermal/thermal_zone0/temp","r");
+		n = fscanf(sys_file,"%d",&millideg);
+		fclose(sys_file);
 		if (n == 0) error_print("Failed to read the CPU temperature\n");
 		systemp = millideg / 100;
-
+		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
 		debug_print("CPU temperature is %f degrees C\n",systemp/10.0);
 
-		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
 
+		// cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
 #ifdef RASPBERRY_PI
 
 #endif
