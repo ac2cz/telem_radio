@@ -10,10 +10,10 @@
 
 /* Header */
 typedef struct __attribute__((__packed__)) {
-	unsigned int id :		3;
-	unsigned int epoch :	16;
-	unsigned int uptime :	25;
-	unsigned int type :		4;
+	unsigned int id :			3;
+	unsigned int epoch :		16;
+	unsigned int uptime :		25;
+	unsigned int type :			4;
 	unsigned int extended_id :	5;
 	unsigned int safe_mode :	1;
 	unsigned int health_mode :	1;
@@ -22,11 +22,11 @@ typedef struct __attribute__((__packed__)) {
 
 typedef struct __attribute__((__packed__)) {
 	unsigned int pi_temperature :	16;
-	unsigned int xruns :	16;
-	unsigned int data0 :	8;
-	unsigned int data1 :	8;
-	unsigned int data2 :	8;
-	unsigned int data3 :	8;
+	unsigned int xruns :			16;
+	unsigned int pi_cpu_freq :		8;
+	unsigned int data1 :			8;
+	unsigned int data2 :			8;
+	unsigned int data3 :			8;
 	unsigned int pad1 :		32;
 	unsigned int pad2 :		32;
 	unsigned int pad3 :		32;

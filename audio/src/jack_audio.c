@@ -91,7 +91,7 @@ int process_audio (jack_nframes_t nframes, void *arg) {
  */
 int start_jack_audio_processor (void) {
 	const char **ports;
-	const char *client_name = "simple";
+	const char *client_name = "telem_radio";
 	const char *server_name = NULL;
 	jack_options_t options = JackNullOption;
 	jack_status_t status;

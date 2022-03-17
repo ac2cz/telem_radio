@@ -138,6 +138,9 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 	packet->header.epoch = epoch;
 	packet->header.uptime = uptime;
 	packet->header.type = type;
+	packet->header.safe_mode = false;
+	packet->header.health_mode = true;
+	packet->header.science_mode = false;
 
 	/* Read the sensors and populate the payload */
 
@@ -146,21 +149,38 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		FILE *sys_file;
 		int n;
 
+		/* Temperature of the CPU */
 		sys_file = fopen("/sys/class/thermal/thermal_zone0/temp","r");
 		n = fscanf(sys_file,"%d",&millideg);
 		fclose(sys_file);
-		if (n == 0) error_print("Failed to read the CPU temperature\n");
-		systemp = millideg / 100;
+		if (n == 0) {
+			error_print("Failed to read the CPU temperature\n");
+			systemp = 0;
+		} else {
+			systemp = millideg / 100;
+		}
 		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
 		debug_print("CPU temperature is %f degrees C\n",systemp/10.0);
 
+		/* Frequency of the CPU - reading from this file causes an XRUN */
+//		int value;
+//		sys_file = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq","r");
+//		n = fscanf(sys_file,"%d",&value);
+//		fclose(sys_file);
+//		if (n == 0) {
+//			error_print("Failed to read the CPU frequency\n");
+//			packet->payload.pi_cpu_freq = 0;
+//		} else {
+//			/* Value is in Hz.  We just want to know if it has dropped from 1.8MHz, so we just need 2 digits. */
+//			packet->payload.pi_cpu_freq = value / 100000;
+//		}
+//		debug_print("CPU temperature is %f MHz C\n",packet->payload.pi_cpu_freq/10.0);
 
-		// cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq
 #ifdef RASPBERRY_PI
 
 #endif
 #ifdef LINUX
-	// Test values go here
+	/* Test values go here */
 
 	packet->payload.xruns = 1;
 	packet->payload.data0 = 0xDE;
