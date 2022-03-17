@@ -100,10 +100,11 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 	int rc = EXIT_SUCCESS;
 
 	/* Assign the spacecraft id */
-	packet->header.id = 1;
+	packet->header.id = 0;
+	packet->header.extended_id = 3; /* id 11 is 8 + 3 */
 
 	/* Get the time stamps
-	 * We calculate an epoch as the number of years since 2000.  i.e. 22 indicates 2022
+	 * We calculate an epoch as the number of years since 2020.  i.e. 2 indicates 2022
 	 * We calculate a time stamp as the number of seconds since the start of the year
 	 */
 	time_t rawtime;
@@ -125,7 +126,8 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 
 	char buffer[26];
 
-	unsigned short epoch = (timeptr->tm_year); /* This is the year - 1900 */
+	unsigned short epoch = (timeptr->tm_year - 120); /* This is the year - 1900 - 120 */
+
 	/* CRUDE VALUE IN SECONDS FOR TESTING.  MUST implement a difference calculation that will take into account DST etc */
 	unsigned int uptime = timeptr->tm_sec + timeptr->tm_min*60 + timeptr->tm_hour*60*60 + timeptr->tm_yday*24*60*60;
 
