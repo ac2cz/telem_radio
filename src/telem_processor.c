@@ -101,7 +101,7 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 
 	/* Assign the spacecraft id */
 	packet->header.id = 0;
-	packet->header.extended_id = 3; /* id 11 is 8 + 3 */
+	packet->header.extended_id = 3; /* SPACECRAFT_ID id 11 is 8 + 3 */
 
 	/* Get the time stamps
 	 * We calculate an epoch as the number of years since 2020.  i.e. 2 indicates 2022

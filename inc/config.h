@@ -16,7 +16,7 @@
 #define false 0
 #define EPOCH_START_YEAR 2000
 
-#define SPACECRAFT_ID 1      /* This is the id placed in the header of each packet */
+#define SPACECRAFT_ID 11      /* This is the id placed in the header of each packet */
 
 /* Global variables declared here.  They are defined in main.c */
 extern int verbose;          /* set from command line switch or from the cmd console */
