@@ -22,6 +22,13 @@ double fir_filter(double in, double *coeffs, double *xv, int len);
  */
 int gen_raised_cosine_coeffs(double * coeffs, double sampleRate, double freq, double alpha, int len);
 
+/*
+ * Generate a root raised cosine filter kernel and return the result in coeffs.  The caller is responsible
+ * for allocating the needed space for the array.
+ */
+int gen_root_raised_cosine_coeffs(double * coeffs, double sampleRate, double freq, double alpha, int len);
+
+
 int test_fir_filter();
 
 #endif /* FIR_FILTER_H_ */

@@ -74,6 +74,8 @@ int run_filter_test(int test_num) {
 	int rc = EXIT_FAILURE;
 	if (test_num == 1)
 		rc = test_iir_filter();
+	else if (test_num == 2)
+		rc = test_fir_filter();
 	else {
 		error_print("Filter test %d does not exist.  Exiting", test_num);
 		exit(EXIT_FAILURE);
@@ -92,7 +94,7 @@ void help(void) {
 			"-v,--verbose              print additional status and progress messages\n"
 #ifdef DEBUG
 			"-t,--test                 run self tests before starting the audio\n"
-			"-f,--filter-test <num>   Run a test on filter <num>, where 1 is the high pass filter\n"
+			"-f,--filter-test <num>   Run a test on filter <num>, where 1 is the high pass filter, 2 is FIR bit filter\n"
 #endif
 	);
 	exit(EXIT_SUCCESS);
@@ -168,6 +170,6 @@ int main(int argc, char *argv[]) {
 
     cleanup_telem_processor();
 
-	printf("Exiting TELEM radio platform ..");
+	printf("Exiting TELEM radio platform ..\n");
 	return rc;
 }

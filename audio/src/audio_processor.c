@@ -80,7 +80,7 @@ double decimate_filter_xv[DECIMATE_FILTER_LEN];
 double interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 double interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
-#define DUV_BIT_FILTER_LEN 96  // this length seems to be critical 48 is too short.  128 does not work at all.
+#define DUV_BIT_FILTER_LEN 60  // 60 is one bit.  If the filter is too long we get ringing.
 double duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
 double duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
@@ -273,6 +273,8 @@ int init_filters() {
 	/* Decimation filter */
 	int decimation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
 	int rc = gen_raised_cosine_coeffs(decimate_filter_coeffs, sample_rate, decimation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
+	memset(decimate_filter_xv, 0, DECIMATE_FILTER_LEN*sizeof(decimate_filter_xv[0]));
+
 	if (rc != 0)
 		return rc;
 
@@ -334,13 +336,15 @@ int init_filters() {
 
 	/* Interpolation filter */
 	int interpolation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
+	memset(interpolate_filter_xv, 0, DECIMATE_FILTER_LEN*sizeof(interpolate_filter_xv[0]));
 	rc = gen_raised_cosine_coeffs(interpolate_filter_coeffs, sample_rate, interpolation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	if (rc != 0)
 		return rc;
 
 	/* Bit shape filter - SHOULD BE UPDATED TO ROOT RAISED COSINE TO MATCH FOXTELEM */
 	int duv_bit_cutoff_freq = 200;
-	rc = gen_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
+	memset(duv_bit_filter_xv, 0, DUV_BIT_FILTER_LEN*sizeof(duv_bit_filter_xv[0]));
+	rc = gen_root_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
 
 	return rc;
 }

@@ -21,6 +21,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "oscillator.h"
 #include "debug.h"
 
@@ -43,17 +44,50 @@ double fir_filter(double in, double *coeffs, double *xv, int len) {
 	return sum;
 }
 
+int gen_root_raised_cosine_coeffs(double *coeffs, double sampleRate, double freq, double alpha, int len) {
+	verbose_print("  Root Raised Cosine Filter Rate: %d Freq:%d Alpha:%f Len:%d\n", (int)sampleRate, (int)freq, alpha, len);
+	int M = len-1;
+
+	double Ts = 1/(freq); // reciprocal of the symbol rate in Hz
+	double sum = 0;
+
+	double tempCoeffs[M+1];
+
+	for (int i=0; i <= M; i++) {
+		double t = (i - M/2) / sampleRate;
+
+		double sin_calc = sin((1 - alpha) * M_PI * t / Ts);
+		double cos_calc = (4 * alpha * t / Ts) * cos((1 + alpha) * M_PI * t / Ts);
+		double det = M_PI * t / Ts * (1 - pow(4 * alpha * t / Ts,2));
+		//double blackman = 0.42 - 0.5 * cos((2 * M_PI * i) / M) + 0.08 * cos((4 * M_PI * i) / M);
+		if (t == 0) {
+			tempCoeffs[i] = 1/sqrt(Ts) * (1 - alpha + 4*alpha/M_PI);
+		} else 	if (t == Ts/(4*alpha) || t == -Ts/(4*alpha)) {
+			tempCoeffs[i] = alpha/sqrt(2 * Ts) * ((1+2/M_PI)* sin(M_PI/(4*alpha)) + (1-2/M_PI)*cos(M_PI/(4*alpha)));
+		} else {
+			tempCoeffs[i] = 1/sqrt(Ts) * ((sin_calc + cos_calc)/det);
+		}
+		//xcoeffs[i] = xcoeffs[i] * blackman;
+		sum += tempCoeffs[i];
+	}
+
+	for (int i=0; i<=M; i++) {
+		coeffs[i] = tempCoeffs[i]/sum;
+	}
+	return 0;
+}
+
 /*
  * Generate a raised cosine filter kernel and return the result in coeffs.  The caller is responsible
  * for allocating the needed space for the array.
  */
 int gen_raised_cosine_coeffs(double *coeffs, double sampleRate, double freq, double alpha, int len) {
-	verbose_print("  Raised Cosine Filter Sample Rate: %d Freq:%d Alpha:%f Len:%d\n", (int)sampleRate, (int)freq, alpha, len);
+	verbose_print("  Raised Cosine Filter Rate: %d Freq:%d Alpha:%f Len:%d\n", (int)sampleRate, (int)freq, alpha, len);
 	int M = len-1;
 	double Fc = freq/sampleRate;
 
-	double sumofsquares = 0;
-	double tempCoeffs[len];
+	double sum = 0;
+	double tempCoeffs[M+1];
 	int limit = (int)(0.5 / (alpha * Fc));
 	for (int i=0; i <= M; i++) {
 		double sinc = (sin(2 * (double)M_PI * Fc * (i - M/2)))/ (i - M/2);
@@ -70,12 +104,13 @@ int gen_raised_cosine_coeffs(double *coeffs, double sampleRate, double freq, dou
 			tempCoeffs[i] = 0.25 * (double)M_PI * sinc;
 		}
 
-		sumofsquares += tempCoeffs[i]*tempCoeffs[i];
+		sum += tempCoeffs[i];
 	}
-	double gain = sqrt(sumofsquares);
+	//double gain = sqrt(sumofsquares);
 
+	/* Gain for low pass filter is equal to the sum of the coefficients, so normalize to have gain = 1 */
 	for (int i=0; i < len; i++) {
-		coeffs[i] = tempCoeffs[len-i-1]/gain;
+		coeffs[i] = tempCoeffs[len-i-1]/sum;
 	}
 	return 0;
 }
@@ -87,36 +122,47 @@ int gen_raised_cosine_coeffs(double *coeffs, double sampleRate, double freq, dou
  ******************************************************************************/
 
 int test_fir_filter() {
-	int fs = 48000;
-	int filter_len = 48;
+	int fs = 12000;
+	int filter_len = 60;
 	double coeffs[filter_len];
 	double filter_xv[filter_len];
-	int rc = gen_raised_cosine_coeffs(coeffs, fs, 6000, 0.5, filter_len);
+	memset(filter_xv, 0, filter_len*sizeof(filter_xv[0]));
+	int rc = gen_root_raised_cosine_coeffs(coeffs, fs, 200, 0.5, filter_len);
 //	for (int i=0; i < filter_len; i++) {
 //		printf("%f\n",coeffs[i]);
 //	}
 
 	int table_size = 9600;
-	double phase1 = 0, phase2 = 0;
-	double freq1 = 1000.0f, freq2 = 8000.0f;
-	int samples_per_sec = 48000;
+//	double phase1 = 0, phase2 = 0;
+//	double freq1 = 100.0f, freq2 = 8000.0f;
 
 	double sin_tab[table_size];
 	rc = gen_sin_table(sin_tab, table_size);
 
-	int len = 600;
+	int len = 1200;
+	int bit_len = fs / 200;
+	int bit_pos = 0;
 	double buffer[len];
 	double buffer2[len];
+	double value = 0.2;
+	int bits[] = {1,-1,1,-1,-1,1,1};  // this gives bits of 1 1 0 0 1 0 0 0 0 1 1 0 ...
+	int p = 0;
 
 	for (int n=0; n< len; n++) {
 		// Fill buffer with the test signal
-		double value = nextSample(&phase1, freq1, samples_per_sec, sin_tab, table_size);
-		double value2 = nextSample(&phase2, freq2, samples_per_sec, sin_tab, table_size);
-		buffer[n] = value + value2;
-		//printf("%f\n",buffer[n]);
+		//double value = nextSample(&phase1, freq1, samples_per_sec, sin_tab, table_size);
+		if (bit_pos >= bit_len) {
+			bit_pos = 0;
+			value = bits[p++] * value;
+			if (p == 7) p = 0;
+		}
+		bit_pos++;
+		//double value2 = nextSample(&phase2, freq2, fs, sin_tab, table_size);
+		buffer[n] = value;// + value2;
+		printf("%f\n",buffer[n]);
 		// Filter
 		buffer2[n] = fir_filter(buffer[n], coeffs, filter_xv, filter_len);
-		printf("%f\n",buffer2[n]);
+		//printf("%f\n",buffer2[n]);
 	}
 
 	return rc;
