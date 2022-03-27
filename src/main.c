@@ -41,15 +41,19 @@
 #include "fir_filter.h"
 #include "oscillator.h"
 
-/* Global variables defined here.  They are declared in config.h */
+/*
+ *  GLOBAL VARIABLES defined here.  They are declared in config.h
+ */
 int verbose = false;
 int sample_rate = 0;
 unsigned short epoch = 0;
+
 
 /* local variables for this file */
 int run_tests = false;
 int more_help = false;
 int filter_test_num = 0;
+int print_filter_test_output = true;
 
 int run_self_test() {
 	int rc = EXIT_SUCCESS;
@@ -59,8 +63,8 @@ int run_self_test() {
 	rc = test_gather_duv_telemetry(); if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_rs_encoder();    if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_sync_word();     if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
-////	rc = test_get_next_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE; /////////////////////// WORK OUT WHY THIS OFTEN FAILS
-	rc = test_modulate_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	rc = test_get_next_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	rc = test_modulate_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;  ////////// WHY SOMETIMES FAILS??
 	//	rc = test_audio_tools();   if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE; // audio tools not currently used
 
 	if (fail == EXIT_SUCCESS)
@@ -70,12 +74,20 @@ int run_self_test() {
 	return fail;
 }
 
-int run_filter_test(int test_num) {
+int run_filter_test(int test_num, int print_filter_test_output) {
+
 	int rc = EXIT_FAILURE;
+
+	fprintf(stderr,"Running Test: %i ", test_num);
+	if (print_filter_test_output == -1)
+		fprintf(stderr," printing filter kernel\n");
+	else
+		fprintf(stderr,"Output printed = %i\n", print_filter_test_output);
+
 	if (test_num == 1)
-		rc = test_iir_filter();
+		rc = test_iir_filter(print_filter_test_output);
 	else if (test_num == 2)
-		rc = test_fir_filter();
+		rc = test_fir_filter(print_filter_test_output);
 	else {
 		error_print("Filter test %d does not exist.  Exiting", test_num);
 		exit(EXIT_FAILURE);
@@ -90,11 +102,16 @@ int run_filter_test(int test_num) {
 void help(void) {
 	printf(
 			"Usage: telem_radio [OPTION]... \n"
-			"-h,--help                 help\n"
-			"-v,--verbose              print additional status and progress messages\n"
+			"-h,--help                        help\n"
+			"-v,--verbose                     print additional status and progress messages\n"
 #ifdef DEBUG
-			"-t,--test                 run self tests before starting the audio\n"
-			"-f,--filter-test <num>   Run a test on filter <num>, where 1 is the high pass filter, 2 is FIR bit filter\n"
+			"-t,--test                        run self tests before starting the audio\n"
+			"-f,--filter-test <num>           Run a test on filter <num>\n"
+			"-i, --print-filter-test-input    Print the input test wave instead of the filter output\n"
+			"Valid filter tests are:\n"
+			"    1 - high pass filter\n"
+			"    2 - FIR bit filter\n"
+			"use telem_radio/scripts/run_filter_test.sh to display the output in a graph"
 #endif
 	);
 	exit(EXIT_SUCCESS);
@@ -108,13 +125,15 @@ int main(int argc, char *argv[]) {
 			{"test", 0, NULL, 't'},
 			{"verbose", 0, NULL, 'v'},
 			{"filter-test", 1, NULL, 'f'},
+			{"print-filter-test-input", 0, NULL, 'i'},
+			{"print_filter_test_kernel", 0, NULL, 'k'},
 			{NULL, 0, NULL, 0},
 	};
 
 	int err = 0;
 	while (1) {
 		int c;
-		if ((c = getopt_long(argc, argv, "htvf:", long_option, NULL)) < 0)
+		if ((c = getopt_long(argc, argv, "htvfi:", long_option, NULL)) < 0)
 			break;
 		switch (c) {
 		case 'h': // help
@@ -122,7 +141,13 @@ int main(int argc, char *argv[]) {
 			break;
 		case 'f': // filter test
 			err = atoi(optarg);
-			filter_test_num = err >= 1 && err < 1024 ? err : 1;
+			filter_test_num = err;
+			break;
+		case 'i': // filter test input
+			print_filter_test_output = 0;
+			break;
+		case 'k': // filter test kernel
+			print_filter_test_output = -1;
 			break;
 		case 't': // self test
 			run_tests = true;
@@ -137,21 +162,26 @@ int main(int argc, char *argv[]) {
 		help();
 		return 0;
 	}
-	printf("TELEM Radio Platform\n");
+
+	if (!filter_test_num)
+		printf("TELEM Radio Platform\n");
 	verbose_print("Build: %s\n", VERSION);
-
-#ifdef RASPBERRY_PI
-	debug_print("Running on a Raspberry PI");
-#endif
-#ifdef LINUX
-	debug_print("Running on Linux");
-#endif
-
 	int rc = EXIT_SUCCESS;
 
 #ifdef DEBUG
+
+#ifdef RASPBERRY_PI
+	if (!filter_test_num)
+		debug_print("Running on a Raspberry PI");
+#endif
+#ifdef LINUX
+	if (!filter_test_num)
+		debug_print("Running on Linux");
+#endif
+
+
 	if (filter_test_num) {
-		rc = run_filter_test(filter_test_num);
+		rc = run_filter_test(filter_test_num, print_filter_test_output);
 		exit(rc);
 	}
 	if (run_tests) {

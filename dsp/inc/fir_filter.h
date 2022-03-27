@@ -29,6 +29,6 @@ int gen_raised_cosine_coeffs(double * coeffs, double sampleRate, double freq, do
 int gen_root_raised_cosine_coeffs(double * coeffs, double sampleRate, double freq, double alpha, int len);
 
 
-int test_fir_filter();
+int test_fir_filter(int print_filter_test_output);
 
 #endif /* FIR_FILTER_H_ */

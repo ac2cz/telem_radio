@@ -47,6 +47,7 @@
 #include "fir_filter.h"
 #include "telem_processor.h"
 #include "oscillator.h"
+#include "dc_filter.h"
 
 /* Forward function declarations */
 double modulate_bit();
@@ -80,7 +81,7 @@ double decimate_filter_xv[DECIMATE_FILTER_LEN];
 double interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 double interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
-#define DUV_BIT_FILTER_LEN 60  // 60 is one bit.  If the filter is too long we get ringing.
+#define DUV_BIT_FILTER_LEN 60 // 60 is one bit.
 double duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
 double duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
@@ -107,6 +108,9 @@ int send_test_tone = false; // output a steady tone for measurement of a sound c
 int measure_test_tone = false; // display the peak ampltude of a received tone to measure the sound card
 int lpf_duv_bits = true;  // filter the DUV telem bits
 
+/* Setup the test bit pattern.  Send this many bits in a row. */
+int TEST_BIT_NUMBER = 5;
+int test_bits_sent = 0;
 
 /*
  * Turn the bit stream into samples that can be fed into the audio loop
@@ -116,9 +120,13 @@ double modulate_bit() {
 			(samples_sent_for_current_bit >= samples_per_duv_bit )) { // We are starting a new bit
 		samples_sent_for_current_bit = 0;
 		starting_bit_modulator = false;
-		if (send_test_telem)
-			current_bit = !current_bit; // TESTING - just toggle the bit to generate 200Hz tone
-		else
+		if (send_test_telem) {
+			test_bits_sent++;
+			if (test_bits_sent == TEST_BIT_NUMBER) {
+				current_bit = !current_bit; // TESTING - just toggle the bit to generate tone
+				test_bits_sent = 0;
+			}
+		} else
 			current_bit = get_next_bit();
 	}
 	samples_sent_for_current_bit++;
@@ -136,6 +144,21 @@ int init_bit_modulator() {
 	samples_sent_for_current_bit = 0;
 	samples_per_duv_bit = sample_rate / DECIMATION_RATE / DUV_BPS;
 	return EXIT_SUCCESS;
+}
+
+jack_default_audio_sample_t * telem_only_audio_loop(jack_default_audio_sample_t *in,
+		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
+
+
+	for (int i = 0; i< nframes; i++) {
+		if (send_duv_telem) {
+			float bit_audio_value = modulate_bit();
+			out[i] = bit_audio_value; // add the telemetry
+		} else {
+			out[i] = 0.0;
+		}
+	}
+	return out;
 }
 
 /**
@@ -183,6 +206,7 @@ jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++) {
 			float bit_audio_value = modulate_bit();
 			hpf_decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
+//			hpf_decimated_audio_buffer[i] += dc_filter(bit_audio_value); // add the telemetry
 		}
 	}
 
@@ -212,36 +236,36 @@ jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 
 jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes) {
 	if (send_test_tone) {
-			for (int i=0; i < nframes; i++) {
-				double value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
-				out[i] = 0.2 * value;
-			}
-		} else if (measure_test_tone) {
-			for (int i=0; i < nframes; i++) {
-				//out[i] = 0; // silence the output, except this does not work if we were already receiving a tone?
-				out[i] = in[i];  // play what we are measuring
-				//printf("%f\n", in[i]);
-
-				if (in[i] > peak_value)  //////////// This compare does not WORK!!
-					peak_value = in[i];
-
-				measurements++;
-
-			}
-			measurement_loops++;
-			if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
-				printf("Peak over %d measurements: %f\n", measurements, peak_value);
-				measurement_loops = 0;
-				measurements = 0;
-				peak_value = 0;
-			}
-		} else {
-			/*
-			 * Now process the data in out buffer before we sent it to the radio
-			 * First we apply a high pass filter at 300Hz
-			 */
-			duv_audio_loop(in, out, nframes);
+		for (int i=0; i < nframes; i++) {
+			double value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
+			out[i] = 0.2 * value;
 		}
+	} else if (measure_test_tone) {
+		for (int i=0; i < nframes; i++) {
+			//out[i] = 0; // silence the output, except this does not work if we were already receiving a tone?
+			out[i] = in[i];  // play what we are measuring
+			//printf("%f\n", in[i]);
+
+			if (in[i] > peak_value)  //////////// This compare does not WORK!!
+				peak_value = in[i];
+
+			measurements++;
+
+		}
+		measurement_loops++;
+		if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
+			printf("Peak over %d measurements: %f\n", measurements, peak_value);
+			measurement_loops = 0;
+			measurements = 0;
+			peak_value = 0;
+		}
+	} else {
+		/*
+		 * Now process the data in out buffer before we sent it to the radio
+		 */
+		//telem_only_audio_loop(in, out, nframes);
+		duv_audio_loop(in, out, nframes);
+	}
 	return out;
 }
 
@@ -273,7 +297,7 @@ int init_filters() {
 	/* Decimation filter */
 	int decimation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
 	int rc = gen_raised_cosine_coeffs(decimate_filter_coeffs, sample_rate, decimation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
-	memset(decimate_filter_xv, 0, DECIMATE_FILTER_LEN*sizeof(decimate_filter_xv[0]));
+	for (int i=0; i< DECIMATE_FILTER_LEN; i++) decimate_filter_xv[i] = 0;
 
 	if (rc != 0)
 		return rc;
@@ -336,15 +360,15 @@ int init_filters() {
 
 	/* Interpolation filter */
 	int interpolation_cutoff_freq = sample_rate / (2* DECIMATION_RATE);
-	memset(interpolate_filter_xv, 0, DECIMATE_FILTER_LEN*sizeof(interpolate_filter_xv[0]));
+	for (int i=0; i< DECIMATE_FILTER_LEN; i++) interpolate_filter_xv[i] = 0;
 	rc = gen_raised_cosine_coeffs(interpolate_filter_coeffs, sample_rate, interpolation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	if (rc != 0)
 		return rc;
 
-	/* Bit shape filter - SHOULD BE UPDATED TO ROOT RAISED COSINE TO MATCH FOXTELEM */
+	/* Bit shape filter */
 	int duv_bit_cutoff_freq = 200;
-	memset(duv_bit_filter_xv, 0, DUV_BIT_FILTER_LEN*sizeof(duv_bit_filter_xv[0]));
-	rc = gen_root_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
+	for (int i=0; i< DUV_BIT_FILTER_LEN; i++) duv_bit_filter_xv[i] = 0;
+	rc = gen_raised_cosine_coeffs(duv_bit_filter_coeffs, sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
 
 	return rc;
 }
@@ -524,8 +548,8 @@ int test_modulate_bit() {
 	//telem_packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data which is used as the second packet
 
 	/* Run for whole first word, the sync word and check that the first and last sample of each bit is correct
-	 * This is 600 bits */
-	for (int i=0; i < 600; i++) {
+	 * This is 10 bits */
+	for (int i=0; i < 10*samples_per_duv_bit; i++) {
 		double bit_audio_value = modulate_bit();
 		if ((i) % samples_per_duv_bit == 0) {
 			// first sample of bit
@@ -561,7 +585,7 @@ int test_modulate_bit() {
 			check_expected_results = true; // now we check the first 40 bits of the second packet, inc sync word
 		}
 		verbose_print ("w:%d ",w);
-		for (int i=0; i < 600; i++) { // 600 samples is a whole word
+		for (int i=0; i < 10*samples_per_duv_bit; i++) { // 600 samples is a whole word
 			double bit_audio_value = modulate_bit();
 
 			if ((i) % samples_per_duv_bit == 0) {

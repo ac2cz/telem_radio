@@ -163,8 +163,8 @@ double iir_filter(TIIRCoeff IIRCoeff, double Signal, TIIRStorage *store) {
  *
  ******************************************************************************/
 
-int test_iir_filter() {
-	printf("Testing Elliptic IIR Filter\n");
+int test_iir_filter(int print_filter_test_output) {
+	verbose_print("Testing Elliptic IIR Filter\n");
 	int samples_per_sec = 12000;
 
 	// Cutoff 0.05 - 300Hz at 12k or 1200Hz at 48k
@@ -220,15 +220,17 @@ int test_iir_filter() {
 		double value2 = nextSample(&phase2, freq2, samples_per_sec, sin_tab, table_size);
 		double value3 = nextSample(&phase3, freq3, samples_per_sec, sin_tab, table_size);
 		buffer[n] = value/3.0 + value2/3.0 + value3/3.0;
-		//printf("%f\n",buffer[n]);
+		if (!print_filter_test_output)
+			printf("%f\n",buffer[n]);
 	}
 
 	// Filter
 	iir_filter_array(Elliptic8Pole300HzHighPassIIRCoeff, buffer, buffer2, len);
 
-	for (int n=0; n< len; n++) {
-		printf("%f\n",buffer2[n]);
-	}
+	if (print_filter_test_output)
+		for (int n=0; n< len; n++) {
+			printf("%f\n",buffer2[n]);
+		}
 
 
 	return rc;

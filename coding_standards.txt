@@ -1,0 +1,52 @@
+Naming Conventions
+~~~~~~~~~~~~~~~~~~
+All constants should be in CAPS
+All functions, variables should be in lowercase_with_underscores
+#typedefs should end with an _t e.g. duv_header_t 
+
+Formatting
+~~~~~~~~~~
+Braces should follow K&R style with the opening brace at the end of the line
+e.g.,
+if (true) {
+	...
+}
+
+Organization
+~~~~~~~~~~~~
+Any c file that needs to share functions or constants should use a header
+file.  Only include function definitions for functions that need to be
+shared across files.  All other functions should be declared at the
+start of the C file with a forward definition.
+
+Any global variables or constants should be declared in config.h and then
+defined only once in main.c
+
+Conventions
+~~~~~~~~~~~
+Every c file should include <stdlib.h> so that it can access the constants 
+EXIT_SUCCESS and EXIT_FAILURE.  These should be the return code from all 
+functions that need to indicate successful execution.
+
+Use true and false rather than 1 and 0.  These are defined in config.h
+
+#define RASPBERRY_PI and LINUX will be used to specify which architecture
+the code is running on.  This will be passed with -D to the pre-processor.
+These defines should only be used where alternative test code is useful on
+linux. e.g. Reading the temperature of the PI sensors should have an alternative
+function to provide a test value on LINUX.
+
+All warnings should be fixed and not left in the code.  A clean compile includes
+zero warnings.  gcc should be run with -Wall
+
+
+Printing Output
+~~~~~~~~~~~~~~~
+Debug statements should output with debug_print().  These statements will
+be removed from the production code.
+
+Verbose output that may still be useful in the production code should use
+verbose_print(), this is only evident if the -v --verbose command line 
+switches are passed or if verbose is typed into the cmd console.
+
+Error statements should be printed with error_print.

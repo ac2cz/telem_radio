@@ -26,6 +26,6 @@ typedef struct {
  void iir_filter_array(TIIRCoeff IIRCoeff, double *Signal, double *FilteredSignal, int NumSigPts);
  double iir_filter(TIIRCoeff IIRCoeff, double Signal, TIIRStorage *store);
 
- int test_iir_filter();
+ int test_iir_filter(int print_filter_test_output);
 
 #endif

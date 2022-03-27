@@ -121,17 +121,22 @@ int gen_raised_cosine_coeffs(double *coeffs, double sampleRate, double freq, dou
  *
  ******************************************************************************/
 
-int test_fir_filter() {
+int test_fir_filter(int print_filter_test_output) {
 	int fs = 12000;
 	int filter_len = 60;
 	double coeffs[filter_len];
 	double filter_xv[filter_len];
-	memset(filter_xv, 0, filter_len*sizeof(filter_xv[0]));
-	int rc = gen_root_raised_cosine_coeffs(coeffs, fs, 200, 0.5, filter_len);
-//	for (int i=0; i < filter_len; i++) {
-//		printf("%f\n",coeffs[i]);
-//	}
+	for (int i=0; i< filter_len; i++) filter_xv[i] = 0;
 
+	int rc = 0;
+	gen_root_raised_cosine_coeffs(coeffs, fs, 200, 0.5, filter_len);
+
+	if (print_filter_test_output == -1) {
+		for (int i=0; i < filter_len; i++) {
+			printf("%f\n",coeffs[i]);
+		}
+		return 0;
+	}
 	int table_size = 9600;
 //	double phase1 = 0, phase2 = 0;
 //	double freq1 = 100.0f, freq2 = 8000.0f;
@@ -139,13 +144,16 @@ int test_fir_filter() {
 	double sin_tab[table_size];
 	rc = gen_sin_table(sin_tab, table_size);
 
-	int len = 1200;
+//	int len = 1200; // bit train
 	int bit_len = fs / 200;
+	int len = bit_len * 10; // impulse
 	int bit_pos = 0;
 	double buffer[len];
 	double buffer2[len];
-	double value = 0.2;
-	int bits[] = {1,-1,1,-1,-1,1,1};  // this gives bits of 1 1 0 0 1 0 0 0 0 1 1 0 ...
+//	double value = 0.2;
+//	int bits[] = {1,-1,1,-1,-1,1,1};  // this gives bits of 1 1 0 0 1 0 0 0 0 1 1 0 ...
+	double value = -0.2;
+	int bits[] = {1,1,-1,-1,-1,-1,-1,1,1,1,1,1,1};  // this gives in impulse
 	int p = 0;
 
 	for (int n=0; n< len; n++) {
@@ -159,10 +167,12 @@ int test_fir_filter() {
 		bit_pos++;
 		//double value2 = nextSample(&phase2, freq2, fs, sin_tab, table_size);
 		buffer[n] = value;// + value2;
-		printf("%f\n",buffer[n]);
+		if (!print_filter_test_output)
+			printf("%f\n",buffer[n]);
 		// Filter
 		buffer2[n] = fir_filter(buffer[n], coeffs, filter_xv, filter_len);
-		//printf("%f\n",buffer2[n]);
+		if (print_filter_test_output)
+			printf("%f\n",buffer2[n]);
 	}
 
 	return rc;

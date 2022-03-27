@@ -35,9 +35,26 @@
 int get_next_packet();
 
 /* Telemetry modulator settings */
-duv_packet_t *telem_packet;
-unsigned char parities[DUV_PARITIES_LENGTH];
-uint16_t encoded_packet[DUV_PACKET_LENGTH+1]; // includes space for SYNC WORD at the end.
+duv_packet_t *telem_packet;                    /* This is the raw data before it is RS encoded */
+unsigned char parities[DUV_PARITIES_LENGTH];   /* This is the parities calculated by the RS encoder */
+uint16_t encoded_packet[DUV_PACKET_LENGTH+1]; /* This is the 10b encoded packet with parities. It includes space for SYNC WORD at the end. */
+
+/* This test packet is a 101010 sequence of 10b words */
+uint16_t encoded_packet1[] = {
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
+		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0xfa
+};
+
 int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
 int bits_sent_for_current_word = 0; // how many bits have we sent for the current 10b word
 int words_sent_for_current_packet; // how many 10b words we have sent for the current packet
@@ -45,6 +62,10 @@ int rd_state = 0; // 8b10b Encoder state, initialized once at startup
 
 void init_rd_state() {
 	rd_state = 0;
+}
+int get_Dnext_packet() {
+	error_print("dummy packet\n");
+	return 0;
 }
 
 int get_next_packet() {
@@ -213,7 +234,7 @@ void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet) {
 }
 
 int init_telemetry_processor() {
-	telem_packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data
+	telem_packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 	first_packet_to_be_sent = true;
 	bits_sent_for_current_word = 0;
 	words_sent_for_current_packet = 0;
@@ -278,7 +299,7 @@ int test_gather_duv_telemetry() {
 	verbose_print("\n");
 
 	int type = 1;
-	duv_packet_t *packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data
+	duv_packet_t *packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 	fail = gather_duv_telemetry(type, packet);
 	free(packet);
 
@@ -308,7 +329,7 @@ int test_encode_packet() {
 	assert(sizeof(duv_header_t) == 6);
 	assert(sizeof(duv_payload_t) == 58);
 	assert(sizeof(duv_packet_t) == DUV_DATA_LENGTH);
-	duv_packet_t *packet = (duv_packet_t*)calloc(sizeof(duv_packet_t),1); // allocate 64 bytes for the packet data
+	duv_packet_t *packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 
 	// This is the same header as the test packet
 	packet->header.id = 1;
@@ -393,6 +414,7 @@ int test_get_next_bit() {
 	/* reset the state of the modulator */
 	init_telemetry_processor();
 	// but then set the test packet rather than the real telemetry that was captured
+	encode_duv_telem_packet(test_packet, encoded_packet);
 
 	// Generate the first 40 bits of the test packet - the header
 	// First four bytes are: 0x51,0x01, 0x40, 0xd8
@@ -411,7 +433,7 @@ int test_get_next_bit() {
 			1,0,0,1,1,1,0,1,0,1,
 			0,0,1,1,0,0,0,1,1,0};
 
-	encode_duv_telem_packet(test_packet, encoded_packet);
+
 	verbose_print("%x %x %x %x\n",test_packet[0], test_packet[1], test_packet[2],test_packet[3]);
 	verbose_print("%x %x %x %x\n",encoded_packet[0], encoded_packet[1], encoded_packet[2],encoded_packet[3]);
 
