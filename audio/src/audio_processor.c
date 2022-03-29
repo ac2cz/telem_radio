@@ -81,7 +81,7 @@ double decimate_filter_xv[DECIMATE_FILTER_LEN];
 double interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 double interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
-#define DUV_BIT_FILTER_LEN 120 // 60 is one bit.
+#define DUV_BIT_FILTER_LEN 180 // 60 is one bit.  Filter across 3 bits seems to be a good trade off
 double duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
 double duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
