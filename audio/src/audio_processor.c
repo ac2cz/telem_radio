@@ -81,7 +81,7 @@ double decimate_filter_xv[DECIMATE_FILTER_LEN];
 double interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 double interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
-#define DUV_BIT_FILTER_LEN 60 // 60 is one bit.
+#define DUV_BIT_FILTER_LEN 120 // 60 is one bit.
 double duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
 double duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
 
@@ -109,7 +109,7 @@ int measure_test_tone = false; // display the peak ampltude of a received tone t
 int lpf_duv_bits = true;  // filter the DUV telem bits
 
 /* Setup the test bit pattern.  Send this many bits in a row. */
-int TEST_BIT_NUMBER = 5;
+int TEST_BIT_NUMBER = 3;
 int test_bits_sent = 0;
 
 /*
@@ -206,12 +206,11 @@ jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++) {
 			float bit_audio_value = modulate_bit();
 			hpf_decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
-//			hpf_decimated_audio_buffer[i] += dc_filter(bit_audio_value); // add the telemetry
 		}
 	}
 
 	/**
-	 * We interpolate by adding 3 samples with zero between each sample.  This creates the same signal
+	 * We interpolate by adding samples with zero between each decimated sample.  This creates the same signal
 	 * at 48k with duplications of the spectrum every 9600Hz.  So we need to filter out those duplicates
 	 * from the final signal.  We apply gain equal to DECIMATION_RATE to compensate for the loss of signal
 	 * from the inserted samples.
@@ -238,7 +237,9 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 	if (send_test_tone) {
 		for (int i=0; i < nframes; i++) {
 			double value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
-			out[i] = 0.2 * value;
+			//out[i] = 0.2 * value;
+			if (value > 0) out[i] = 0.2;
+			else out[i] = -0.2;
 		}
 	} else if (measure_test_tone) {
 		for (int i=0; i < nframes; i++) {

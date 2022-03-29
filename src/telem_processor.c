@@ -152,8 +152,8 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 	/* CRUDE VALUE IN SECONDS FOR TESTING.  MUST implement a difference calculation that will take into account DST etc */
 	unsigned int uptime = timeptr->tm_sec + timeptr->tm_min*60 + timeptr->tm_hour*60*60 + timeptr->tm_yday*24*60*60;
 
-	debug_print("\nEpoch: %d Uptime: %d Type: %d\n",epoch, uptime, type);
-	debug_print("Storing Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
+	verbose_print("\nEpoch: %d Uptime: %d Type: %d\n",epoch, uptime, type);
+	verbose_print("Storing Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
 
 	/* Build the header */
 	packet->header.epoch = epoch;
