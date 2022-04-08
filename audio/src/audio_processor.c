@@ -109,8 +109,13 @@ int measure_test_tone = false; // display the peak ampltude of a received tone t
 int lpf_duv_bits = true;  // filter the DUV telem bits
 
 /* Setup the test bit pattern.  Send this many bits in a row. */
-int TEST_BIT_NUMBER = 3;
+int TEST_BIT_NUMBER = 5;
 int test_bits_sent = 0;
+
+int zero_bits_in_a_row = 0;
+int one_bits_in_a_row = 0;
+int clipping_reported = 0;
+
 
 /*
  * Turn the bit stream into samples that can be fed into the audio loop
@@ -128,9 +133,19 @@ double modulate_bit() {
 			}
 		} else
 			current_bit = get_next_bit();
+
+		if (current_bit) {
+			one_bits_in_a_row++;
+			zero_bits_in_a_row = 0;
+		} else {
+			one_bits_in_a_row = 0;
+			zero_bits_in_a_row++;
+		}
 	}
 	samples_sent_for_current_bit++;
 	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
+	if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * RAMP_AMT;
+	if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * RAMP_AMT;
 
 	if (lpf_duv_bits)
 		bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
@@ -228,6 +243,11 @@ jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 	/* Now filter out the duplications of the spectrum that interpolation introduces */
 	for (int i = 0; i< nframes; i++) {
 		out[i] = (float)fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
+		if (!clipping_reported)
+			if (out[i] > 1.0) {
+				error_print("Audio is clipping! %f",out[i]);
+				clipping_reported = 1;
+			}
 	}
 
 	return out;
@@ -266,6 +286,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 		 */
 		//telem_only_audio_loop(in, out, nframes);
 		duv_audio_loop(in, out, nframes);
+		clipping_reported = 0;
 	}
 	return out;
 }

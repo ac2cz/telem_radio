@@ -40,7 +40,7 @@ unsigned char parities[DUV_PARITIES_LENGTH];   /* This is the parities calculate
 uint16_t encoded_packet[DUV_PACKET_LENGTH+1]; /* This is the 10b encoded packet with parities. It includes space for SYNC WORD at the end. */
 
 /* This test packet is a 101010 sequence of 10b words */
-uint16_t encoded_packet1[] = {
+uint16_t encoded_packet_test1[] = {
 		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
 		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,
 		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,

@@ -17,8 +17,11 @@
  * These values specify the strength of the telemetry.  They should be carefully calculated and set.
  * This should probably be in a configuration file.
  */
-#define ONE_VALUE 0.5
-#define ZERO_VALUE -0.5
+#define ONE_VALUE 0.20
+#define ZERO_VALUE -0.20
+
+/* When bits have the same value ramp the amount up to compensate for HPF in the radio transmitter */
+#define RAMP_AMT 0.1 * ONE_VALUE
 
 jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes);
 int cmd_console();
