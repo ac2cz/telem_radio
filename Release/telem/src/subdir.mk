@@ -4,17 +4,20 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../src/main.c 
+../telem/src/TelemEncoding.c \
+../telem/src/telem_processor.c 
 
 C_DEPS += \
-./src/main.d 
+./telem/src/TelemEncoding.d \
+./telem/src/telem_processor.d 
 
 OBJS += \
-./src/main.o 
+./telem/src/TelemEncoding.o \
+./telem/src/telem_processor.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
-src/%.o: ../src/%.c src/subdir.mk
+telem/src/%.o: ../telem/src/%.c telem/src/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
 	gcc -I../inc -I../dsp/inc -I../audio/inc -O3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
@@ -22,10 +25,10 @@ src/%.o: ../src/%.c src/subdir.mk
 	@echo ' '
 
 
-clean: clean-src
+clean: clean-telem-2f-src
 
-clean-src:
-	-$(RM) ./src/main.d ./src/main.o
+clean-telem-2f-src:
+	-$(RM) ./telem/src/TelemEncoding.d ./telem/src/TelemEncoding.o ./telem/src/telem_processor.d ./telem/src/telem_processor.o
 
-.PHONY: clean-src
+.PHONY: clean-telem-2f-src
 

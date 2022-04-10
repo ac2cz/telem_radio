@@ -19,15 +19,20 @@
  *
  */
 
+/* System */
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 /* libraries */
 #include <jack/jack.h>
-#include <config.h>
-#include <debug.h>
-#include <audio_processor.h>
+
+/* Program */
+#include "config.h"
+#include "debug.h"
+#include "audio_processor.h"
+#include "telem_thread.h"
 
 jack_port_t *input_port;
 jack_port_t *output_port;
@@ -47,6 +52,15 @@ double total_cpu_time_used;
  */
 void jack_shutdown (void *arg) {
 	exit (1);
+}
+
+int jack_xrun_callback(void *arg)  {
+	/* count xruns */
+	static int xruns = 0;
+	xruns += 1;
+	fprintf (stderr, "xrun %i \n", xruns);
+	telem_thread_set_xruns(xruns);
+	return 0;
 }
 
 /**
@@ -76,7 +90,8 @@ int process_audio (jack_nframes_t nframes, void *arg) {
 	loops_timed++;
 	total_cpu_time_used += cpu_time_used;
 	if (total_cpu_time_used > LOOPS_TO_TIME) {
-		verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
+		telem_thread_set_loop_time_10_mills(round(10000*total_cpu_time_used/loops_timed));
+		//verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
 		total_cpu_time_used = 0;
 		loops_timed = 0;
 	}
@@ -126,6 +141,9 @@ int start_jack_audio_processor (void) {
 	   just decides to stop calling us.
 	 */
 	jack_on_shutdown (client, jack_shutdown, 0);
+
+	/* Setup a callback to track XRUNS */
+	jack_set_xrun_callback(client, jack_xrun_callback, 0);
 
 	/* display the current sample rate */
 	sample_rate = jack_get_sample_rate (client);

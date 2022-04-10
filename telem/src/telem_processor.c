@@ -17,6 +17,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
+ * The telemetry processor encodes packets and supplies the bits to the
+ * audio processor.
+ *
  */
 
 #include <stdio.h>
@@ -25,19 +28,21 @@
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#include <sched.h>
 
 #include "debug.h"
 #include "config.h"
 #include "telem_processor.h"
 #include "TelemEncoding.h"
+#include "telem_thread.h"
 
 /* Forward function definitions */
-int get_next_packet();
 
 /* Telemetry modulator settings */
-duv_packet_t *telem_packet;                    /* This is the raw data before it is RS encoded */
 unsigned char parities[DUV_PARITIES_LENGTH];   /* This is the parities calculated by the RS encoder */
-uint16_t encoded_packet[DUV_PACKET_LENGTH+1]; /* This is the 10b encoded packet with parities. It includes space for SYNC WORD at the end. */
+uint16_t encoded_packet[2][DUV_PACKET_LENGTH+1]; /* This is the 10b encoded packet with parities. It includes space for SYNC WORD at the end. */
+int current_encoded_packet_num = 0; /* We have two encoded packets.  One is being sent and the other is being built. */
+int buffer_ready[2] = {false, false};
 
 /* This test packet is a 101010 sequence of 10b words */
 uint16_t encoded_packet_test1[] = {
@@ -63,25 +68,33 @@ int rd_state = 0; // 8b10b Encoder state, initialized once at startup
 void init_rd_state() {
 	rd_state = 0;
 }
-int get_Dnext_packet() {
-	error_print("dummy packet\n");
-	return 0;
-}
 
-int get_next_packet() {
+int encode_next_packet(int packet_num) {
 	int rc = EXIT_SUCCESS;
-	int type = 1;
-	rc = gather_duv_telemetry(type, telem_packet);
-	if (rc != 0) {
-		error_print("Error creating first telemetry packet\n");
-		return rc;
-	}
-	encode_duv_telem_packet((unsigned char *)telem_packet, encoded_packet);
+	debug_print("DEBUG: Getting next packet\n");
+	encode_duv_telem_packet((unsigned char *)telem_packet, encoded_packet[packet_num]);
 	return rc;
 }
 
+/**
+ * This is called at the end of each bit.  The length of the bit is determined by the
+ * audio_processor and depends on the sample rate and decimation.  At the end of each
+ * bit the audio_processor calls this routine to get the next bit.
+ *
+ * This routine knows the length of words and packets so it can move from
+ * bit to bit.  If we have run out of words in the current packet then it swaps the
+ * buffers.
+ *
+ */
 int get_next_bit() {
 	int current_bit = -1; // the first bit is set to be the sync word
+
+	if (bits_sent_for_current_word == 0 && words_sent_for_current_packet == 0) {
+		// This is the start of sending a packets.
+		// Tell the telem thread to fill the next one
+		telem_thread_fill_next_packet();
+		debug_print("Starting to send packet: %i\n", current_encoded_packet_num);
+	}
 
 	if (bits_sent_for_current_word >= BITS_PER_10b_WORD) { // We are starting a new 10b word
 		bits_sent_for_current_word = 0;
@@ -94,11 +107,17 @@ int get_next_bit() {
 		if (words_sent_for_current_packet >= DUV_PACKET_LENGTH+1) { // We are ready for a new packet.  We have the sync word in the final word
 			words_sent_for_current_packet = 0;
 
-			int rc = get_next_packet();
-			if (rc != 0) {
-				error_print("Failed to get the next telemetry packet");
-				// TODO - we need to reset things here.  The next bit to be sent is going to be wrong
+			int next_packet = telem_thread_get_packet_num();
+			debug_print("next packet: %i\n", next_packet);
+			if (next_packet == current_encoded_packet_num) {
+				error_print("Next packet was not available\n");
+				// TODO - we need to reset things here and send the sync word again.
+			} else {
+				current_encoded_packet_num = next_packet;
 			}
+			// TODO - call at end as well as start?
+			// TODO - is this causing audio clipping somehow.....
+			telem_thread_fill_next_packet();
 		}
 
 	}
@@ -106,7 +125,7 @@ int get_next_bit() {
 	/* If we are starting to transmit then send the sync word first */
 	uint16_t current_word = 0xfa;
 	if (!first_packet_to_be_sent) {
-		current_word = encoded_packet[words_sent_for_current_packet];
+		current_word = encoded_packet[current_encoded_packet_num][words_sent_for_current_packet];
 	}
 	// we send most significant bit first of the 10 bit word
 	int shift_amt = 9 - bits_sent_for_current_word;
@@ -116,102 +135,6 @@ int get_next_bit() {
 	return current_bit;
 }
 
-int gather_duv_telemetry(int type, duv_packet_t *packet) {
-
-	int rc = EXIT_SUCCESS;
-
-	/* Assign the spacecraft id */
-	packet->header.id = 0;
-	packet->header.extended_id = 3; /* SPACECRAFT_ID id 11 is 8 + 3 */
-
-	/* Get the time stamps
-	 * We calculate an epoch as the number of years since 2020.  i.e. 2 indicates 2022
-	 * We calculate a time stamp as the number of seconds since the start of the year
-	 */
-	time_t rawtime;
-
-	time_t trc = time ( &rawtime );
-	if (trc == (time_t)-1) {
-		error_print("Could not read the current time\n");
-		return EXIT_FAILURE;
-	}
-
-	/* Call localtime_r to make sure this works with multiple threads */
-	struct tm timeinfo;
-	struct tm * timeptr;
-	timeptr = localtime_r ( &rawtime, &timeinfo );
-	if (timeptr != &timeinfo) {
-		error_print("Could not convert time to broken down format\n");
-		return EXIT_FAILURE;
-	}
-
-	char buffer[26];
-
-	unsigned short epoch = (timeptr->tm_year - 120); /* This is the year - 1900 - 120 */
-
-	/* CRUDE VALUE IN SECONDS FOR TESTING.  MUST implement a difference calculation that will take into account DST etc */
-	unsigned int uptime = timeptr->tm_sec + timeptr->tm_min*60 + timeptr->tm_hour*60*60 + timeptr->tm_yday*24*60*60;
-
-	verbose_print("\nEpoch: %d Uptime: %d Type: %d\n",epoch, uptime, type);
-	verbose_print("Storing Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
-
-	/* Build the header */
-	packet->header.epoch = epoch;
-	packet->header.uptime = uptime;
-	packet->header.type = type;
-	packet->header.safe_mode = false;
-	packet->header.health_mode = true;
-	packet->header.science_mode = false;
-
-	/* Read the sensors and populate the payload */
-
-	int millideg;
-	unsigned short systemp;
-		FILE *sys_file;
-		int n;
-
-		/* Temperature of the CPU */
-		sys_file = fopen("/sys/class/thermal/thermal_zone0/temp","r");
-		n = fscanf(sys_file,"%d",&millideg);
-		fclose(sys_file);
-		if (n == 0) {
-			error_print("Failed to read the CPU temperature\n");
-			systemp = 0;
-		} else {
-			systemp = millideg / 100;
-		}
-		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
-		debug_print("CPU temperature is %f degrees C\n",systemp/10.0);
-
-		/* Frequency of the CPU - reading from this file causes an XRUN */
-//		int value;
-//		sys_file = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq","r");
-//		n = fscanf(sys_file,"%d",&value);
-//		fclose(sys_file);
-//		if (n == 0) {
-//			error_print("Failed to read the CPU frequency\n");
-//			packet->payload.pi_cpu_freq = 0;
-//		} else {
-//			/* Value is in Hz.  We just want to know if it has dropped from 1.8MHz, so we just need 2 digits. */
-//			packet->payload.pi_cpu_freq = value / 100000;
-//		}
-//		debug_print("CPU temperature is %f MHz C\n",packet->payload.pi_cpu_freq/10.0);
-
-#ifdef RASPBERRY_PI
-
-#endif
-#ifdef LINUX
-	/* Test values go here */
-
-	packet->payload.xruns = 1;
-	packet->payload.data0 = 0xDE;
-	packet->payload.data1 = 0xAD;
-	packet->payload.data2 = 0xBE;
-	packet->payload.data3 = 0xEF;
-#endif
-
-	return rc;
-}
 
 /**
  * This takes a telemetry frame and encodes it ready for transmission
@@ -238,9 +161,9 @@ int init_telemetry_processor() {
 	first_packet_to_be_sent = true;
 	bits_sent_for_current_word = 0;
 	words_sent_for_current_packet = 0;
+	current_encoded_packet_num = 0;
 	init_rd_state();
-	int rc = get_next_packet();
-	return rc;
+	return 0;
 }
 
 /*
@@ -255,7 +178,10 @@ void cleanup_telem_processor() {
  * TEST FUNCTIONS
  *
  ******************************************************************************/
-/* Test Type 1 packet with id 1.  This will look like Fox-1A in FoxTelem */
+/* Test Type 1 packet with id 1.  This will look like Fox-1A in FoxTelem
+ * Note that this has a different header.  It has the old Fox-1A header and
+ * does not use the extended FOX-ID.
+ */
 unsigned char test_packet[] = {
 		0x51,0x01,0x40,0xd8,0x00,0x10,0x00,0x00,
 		0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
@@ -267,8 +193,7 @@ unsigned char test_packet[] = {
 		0x01,0x01,0x17,0x38,0xac,0x00,0x00,0x20};
 
 unsigned char * set_test_packet() {
-
-	encode_duv_telem_packet((unsigned char *)test_packet, encoded_packet);
+	encode_duv_telem_packet((unsigned char *)test_packet, encoded_packet[0]);
 	return (unsigned char *)test_packet;
 }
 
@@ -293,24 +218,6 @@ int test_telem_encoder(unsigned char *packet, uint16_t *encoded_packet) {
 	return fail;
 }
 
-int test_gather_duv_telemetry() {
-	int fail = EXIT_SUCCESS;
-	printf("TESTING gather_duv_telemetry .. ");
-	verbose_print("\n");
-
-	int type = 1;
-	duv_packet_t *packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
-	fail = gather_duv_telemetry(type, packet);
-	free(packet);
-
-	if (fail == EXIT_SUCCESS) {
-		printf(" Pass\n");
-	} else {
-		printf(" Fail\n");
-	}
-	return fail;
-}
-
 /**
  * Generate a test packet by specifying the data
  */
@@ -324,10 +231,10 @@ int test_encode_packet() {
 	};
 
 	verbose_print("Packet header length: %i\n",(int)sizeof(duv_header_t))
-	verbose_print("Packet payload length: %i\n",(int)sizeof(duv_payload_t))
+	verbose_print("Packet payload length: %i\n",(int)sizeof(rttelemetry_t))
 	verbose_print("Packet structure length: %i\n",(int)sizeof(duv_packet_t))
-	assert(sizeof(duv_header_t) == 6);
-	assert(sizeof(duv_payload_t) == 58);
+	assert(sizeof(duv_header_t) == 7);
+	assert(sizeof(rttelemetry_t) == 57);
 	assert(sizeof(duv_packet_t) == DUV_DATA_LENGTH);
 	duv_packet_t *packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 
@@ -348,7 +255,7 @@ int test_encode_packet() {
 		verbose_print(" byte: %d %x\n",i,ptr[i]);
 	}
 	free(packet);
-	if (fail == EXIT_FAILURE) {
+	if (fail == EXIT_SUCCESS) {
 		printf(" Pass\n");
 	} else {
 		printf(" Fail\n");
@@ -364,7 +271,7 @@ int test_rs_encoder() {
 	printf("TESTING Rs Encoder .. ");
 	init_rd_state();
 	// Call the RS encoder without 8b10b encoding
-	test_telem_encoder(test_packet, encoded_packet);
+	test_telem_encoder(test_packet, encoded_packet[0]);
 
 	// Now check the parity bytes
 	// First should be 0x19 -> 25
@@ -372,7 +279,7 @@ int test_rs_encoder() {
 	//printf("First parity: %i \n",test_encoded_packet[DUV_DATA_LENGTH]);
 	//printf("Last Parity: %i \n",test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1]);
 	for (int i=0; i < DUV_PARITIES_LENGTH; i++) {
-		if (encoded_packet[DUV_DATA_LENGTH+i] != test_rs_parities_check[i]) {
+		if (encoded_packet[0][DUV_DATA_LENGTH+i] != test_rs_parities_check[i]) {
 			verbose_print(" failed with parity %d\n", i);
 			fail = 1;
 		}
@@ -388,11 +295,11 @@ int test_rs_encoder() {
 int test_sync_word() {
 	// test that the sync word is the last word in the packet
 	int fail = 0;
-	printf("TESTING Sync word .. %x %x ",0xfa, (~0xfa) & 0x3ff);
+	printf("TESTING Sync word %x %x .. ",0xfa, (~0xfa) & 0x3ff);
 	init_rd_state();
-	encode_duv_telem_packet(test_packet, encoded_packet);
+	encode_duv_telem_packet(test_packet, encoded_packet[0]);
 
-	uint16_t word = encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH];
+	uint16_t word = encoded_packet[0][DUV_DATA_LENGTH+DUV_PARITIES_LENGTH];
 	verbose_print(" Sync Word is %x \n",word );
 
 	if (word != 0x0fa && word != 0x305) // 0x305 is ~0xfa
@@ -414,7 +321,7 @@ int test_get_next_bit() {
 	/* reset the state of the modulator */
 	init_telemetry_processor();
 	// but then set the test packet rather than the real telemetry that was captured
-	encode_duv_telem_packet(test_packet, encoded_packet);
+	encode_duv_telem_packet(test_packet, encoded_packet[0]);
 
 	// Generate the first 40 bits of the test packet - the header
 	// First four bytes are: 0x51,0x01, 0x40, 0xd8
@@ -435,7 +342,7 @@ int test_get_next_bit() {
 
 
 	verbose_print("%x %x %x %x\n",test_packet[0], test_packet[1], test_packet[2],test_packet[3]);
-	verbose_print("%x %x %x %x\n",encoded_packet[0], encoded_packet[1], encoded_packet[2],encoded_packet[3]);
+	verbose_print("%x %x %x %x\n",encoded_packet[0][0], encoded_packet[0][1], encoded_packet[0][2],encoded_packet[0][3]);
 
 	for (int i=0; i < 50; i++) {
 		int b = get_next_bit();
@@ -455,10 +362,10 @@ int test_get_next_bit() {
 	//	printf("First parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH] );
 	//	printf("Last Parity: %x \n",test_encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1] );
 
-	if (encoded_packet[DUV_DATA_LENGTH] != 0x264) {
+	if (encoded_packet[0][DUV_DATA_LENGTH] != 0x264) {
 		fail = 1;
 	}
-	if (encoded_packet[DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1] != 0x7a) {
+	if (encoded_packet[0][DUV_DATA_LENGTH+DUV_PARITIES_LENGTH-1] != 0x7a) {
 		fail = 1;
 	}
 

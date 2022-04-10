@@ -26,12 +26,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
+#include <pthread.h>
+#include <signal.h>
 
 /* project include files */
 #include "config.h"
 #include "debug.h"
 #include "jack_audio.h"
 #include "audio_processor.h"
+#include "telem_thread.h"
 
 /* Included for self tests */
 #include "iir_filter.h"
@@ -47,9 +50,10 @@
 int verbose = false;
 int sample_rate = 0;
 unsigned short epoch = 0;
-
+int ramp_bits_to_compensate_hpf = true;
 
 /* local variables for this file */
+pthread_t telem_pthread;
 int run_tests = false;
 int more_help = false;
 int filter_test_num = 0;
@@ -60,17 +64,20 @@ int run_self_test() {
 	int fail = EXIT_SUCCESS;
 	printf("\nRunning Self Test..\n");
 	//rc = test_oscillator(); exit(1);
-	rc = test_gather_duv_telemetry(); if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_rs_encoder();    if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_sync_word();     if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_get_next_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_modulate_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;  ////////// WHY SOMETIMES FAILS??
+	rc = test_encode_packet();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+	rc = test_gather_duv_telemetry(); if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	//	rc = test_audio_tools();   if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE; // audio tools not currently used
+
 
 	if (fail == EXIT_SUCCESS)
 		printf("All Tests Passed\n\n");
 	else
 		printf("Some Tests Failed\n\n");
+
 	return fail;
 }
 
@@ -117,7 +124,21 @@ void help(void) {
 	exit(EXIT_SUCCESS);
 }
 
+void signal_handler (int sig) {
+	fprintf (stderr, " signal received, exiting ...\n");
+
+	// EXIT THE CONSOLE AND STOP JACK
+	//telem_thread_stop();
+	//cleanup_telem_processor();
+	exit (0);
+}
+
 int main(int argc, char *argv[]) {
+
+	signal (SIGQUIT, signal_handler);
+	signal (SIGTERM, signal_handler);
+	signal (SIGHUP, signal_handler);
+	signal (SIGINT, signal_handler);
 
 	struct option long_option[] =
 	{
@@ -196,8 +217,17 @@ int main(int argc, char *argv[]) {
 		error_print("FATAL. Could not initialize the telemetry processor.\n");
 		exit(rc);
 	}
+
+	char *name = "Telem Thread";
+	rc = pthread_create( &telem_pthread, NULL, telem_thread_process, (void*) name);
+	if (rc != EXIT_SUCCESS) {
+		error_print("FATAL. Could not start the telemetry thread.\n");
+		exit(rc);
+	}
+
     rc = start_jack_audio_processor();
 
+    telem_thread_stop();
     cleanup_telem_processor();
 
 	printf("Exiting TELEM radio platform ..\n");

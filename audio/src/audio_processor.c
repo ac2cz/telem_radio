@@ -144,8 +144,10 @@ double modulate_bit() {
 	}
 	samples_sent_for_current_bit++;
 	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
-	if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * RAMP_AMT;
-	if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * RAMP_AMT;
+	if (ramp_bits_to_compensate_hpf) {
+		if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * RAMP_AMT;
+		if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * RAMP_AMT;
+	}
 
 	if (lpf_duv_bits)
 		bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
@@ -299,6 +301,10 @@ int init() {
 	/* Encode first packet */
 	int rc;
 	rc = init_bit_modulator();
+	if (rc != 0) {
+		error_print("Error initializing bit modulator\n");
+		return rc;
+	}
 
 	/* now we know the sample rate then setup things that are dependent on that */
 	rc = init_filters();
@@ -536,8 +542,11 @@ unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0
 int test_modulate_bit() {
 	printf("TESTING modulate_bit .. ");
 	verbose_print("\n");
-	int lpf = lpf_duv_bits;
+	int lpf = lpf_duv_bits; // store this value to reset after the test
+	int ramp = ramp_bits_to_compensate_hpf; // store this value to reset after the test
 	lpf_duv_bits = false; // turn this off just for the test
+	ramp_bits_to_compensate_hpf = false;// turn this off just for the test
+
 	int fail = 0;
 	int expected_result1[] = {
 			0,0,1,1,1,1,1,0,1,0,  // the sync word 0xfa
@@ -649,7 +658,7 @@ int test_modulate_bit() {
 		b = 9;
 	}
 	lpf_duv_bits = lpf; // reset this after the test
-
+	ramp_bits_to_compensate_hpf = ramp; // reset after the test
 	if (fail == 0) {
 		printf(" Pass\n");
 	} else {

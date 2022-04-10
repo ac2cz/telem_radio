@@ -3,6 +3,20 @@
  *
  *  Created on: Feb 24, 2022
  *      Author: g0kla
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>
+ *
  */
 #ifndef TELEM_PROCESSOR_C_
 #define TELEM_PROCESSOR_C_
@@ -12,10 +26,12 @@
 
 /* Store the values for the telemetry modulator */
 #define DUV_BPS 200
-#define DUV_PACKET_LENGTH 96  // 4 header bytes, 60 payload bytes, 32 check bytes
+#define DUV_PACKET_LENGTH 96  /* 4 header bytes, 60 payload bytes, 32 check bytes */
 #define DUV_DATA_LENGTH 64
 #define DUV_PARITIES_LENGTH 32
 #define BITS_PER_10b_WORD 10
+
+duv_packet_t *telem_packet;  /* This is the raw data before it is RS encoded */
 
 /*
  * Set the running disparity to zero.  This is called just once at startup,
@@ -24,9 +40,14 @@
 void init_rd_state();
 
 /*
- * Given a frame type, gather and populate the duv telemetry packet
+ * Ask the telem processor to set the a packet ready for transmission
  */
-int gather_duv_telemetry(int type, duv_packet_t *packet);
+int encode_next_packet(int packet_num);
+
+/**
+ * Gather the telemetry data and store the next raw packet
+ */
+int set_next_packet();
 
 /*
  * Takes an array of bytes as input and encodes them as 10 bits words with RS parities
@@ -50,7 +71,6 @@ void cleanup_telem_processor();
  * Self test functions
  */
 unsigned char * set_test_packet();
-int test_gather_duv_telemetry();
 int test_telem_encoder(unsigned char *packet, uint16_t *encoded_packet);
 int test_encode_packet();
 unsigned char reverse_8b10b_lookup(uint16_t word);
