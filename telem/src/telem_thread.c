@@ -38,6 +38,7 @@
 
 #include "config.h"
 #include "debug.h"
+#include "jack_audio.h"
 #include "telem_processor.h"
 
 /* Forward function definitions */
@@ -187,8 +188,7 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 #ifdef RASPBERRY_PI
 #endif
 #ifndef LINUX
-		packet->payload.cpu_speed = 10;
-		verbose_print("CPU Speed is %.2f MHz\n",packet->payload.cpu_speed/10.0);
+
 #endif
 
 		/* Audio loop time */
