@@ -189,22 +189,22 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
 		verbose_print("CPU temperature is %f degrees C\n",systemp/10.0);
 
+		/* Frequency of the CPU - reading from this file sometimes causes an XRUN */
+		int value;
+		sys_file = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq","r");
+		n = fscanf(sys_file,"%d",&value);
+		fclose(sys_file);
+		if (n == 0) {
+			error_print("Failed to read the CPU frequency\n");
+			packet->payload.cpu_speed = 0;
+		} else {
+			/* Value is in Hz.  We just want to know if it has dropped from 1.8MHz, so we just need 2 digits. */
+			packet->payload.cpu_speed = value / 100000;
+		}
+		verbose_print("CPU Speed is %f MHz\n",packet->payload.cpu_speed/10.0);
 #ifdef RASPBERRY_PI
-//		/* Frequency of the CPU - reading from this file sometimes causes an XRUN */
-//		int value;
-//		sys_file = fopen("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq","r");
-//		n = fscanf(sys_file,"%d",&value);
-//		fclose(sys_file);
-//		if (n == 0) {
-//			error_print("Failed to read the CPU frequency\n");
-//			packet->payload.cpu_speed = 0;
-//		} else {
-//			/* Value is in Hz.  We just want to know if it has dropped from 1.8MHz, so we just need 2 digits. */
-//			packet->payload.cpu_speed = value / 100000;
-//		}
-//		verbose_print("CPU Speed is %f MHz\n",packet->payload.cpu_speed/10.0);
 #endif
-#ifndef RASPBERRY_PI
+#ifndef LINUX
 		packet->payload.cpu_speed = 10;
 		verbose_print("CPU Speed is %f MHz\n",packet->payload.cpu_speed/10.0);
 #endif

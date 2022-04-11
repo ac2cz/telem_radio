@@ -24,6 +24,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <sys/time.h>
 
 /* libraries */
 #include <jack/jack.h>
@@ -39,12 +40,13 @@ jack_port_t *output_port;
 jack_client_t *client;
 
 // Performance timing variables
-clock_t start, end;
+struct timeval start, end;
 double cpu_time_used;
 double max_cpu_time_used;
+double min_cpu_time_used = 999999;
 int loops_timed = 0;
 double total_cpu_time_used;
-#define LOOPS_TO_TIME 5.0  // every few seconds
+#define LOOPS_TO_TIME 400.0  // Each loop is circa 10ms.  Time about once per telem frame
 
 
 /**
@@ -74,7 +76,7 @@ int jack_xrun_callback(void *arg)  {
  *
  */
 int process_audio (jack_nframes_t nframes, void *arg) {
-	start = clock();
+	gettimeofday(&start, NULL);
 	assert(nframes == PERIOD_SIZE);
 	jack_default_audio_sample_t *in, *out;
 
@@ -83,21 +85,27 @@ int process_audio (jack_nframes_t nframes, void *arg) {
 
 	audio_loop(in, out, nframes);
 
-	end = clock();
-	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	if (cpu_time_used > max_cpu_time_used) { // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
+	gettimeofday(&end, NULL);
+	/* store the CPU time in microseconds */
+	cpu_time_used = ((end.tv_sec * 1000000 + end.tv_usec) -
+		    (start.tv_sec * 1000000 + start.tv_usec));
+	//cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
+	if (cpu_time_used > max_cpu_time_used)
 		max_cpu_time_used = cpu_time_used;
-
-	}
+	if (cpu_time_used < min_cpu_time_used)
+		min_cpu_time_used = cpu_time_used;
 	loops_timed++;
 	total_cpu_time_used += cpu_time_used;
-	if (total_cpu_time_used > LOOPS_TO_TIME) {
-		telem_thread_set_loop_time_10_mills(round(10000*total_cpu_time_used/loops_timed));
+	if (loops_timed > LOOPS_TO_TIME) {
+		telem_thread_set_loop_time_10_mills(round(total_cpu_time_used/loops_timed/1000.0));
 		//verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
-		if (max_cpu_time_used > 0.01)
-			debug_print("WARNING: Loop ran for: %f secs\n",cpu_time_used);
+		if (max_cpu_time_used > 10000) // // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
+			debug_print("WARNING: Loop ran for: %f ms\n",max_cpu_time_used/1000);
+		debug_print("Max loop time: %f ms\n",max_cpu_time_used/1000);
+		debug_print("Min loop time: %f ms\n",min_cpu_time_used/1000);
 		total_cpu_time_used = 0;
 		max_cpu_time_used = 0;
+		min_cpu_time_used = 99999;
 		loops_timed = 0;
 	}
 	return 0;
