@@ -41,6 +41,7 @@ jack_client_t *client;
 // Performance timing variables
 clock_t start, end;
 double cpu_time_used;
+double max_cpu_time_used;
 int loops_timed = 0;
 double total_cpu_time_used;
 #define LOOPS_TO_TIME 5.0  // every few seconds
@@ -84,15 +85,19 @@ int process_audio (jack_nframes_t nframes, void *arg) {
 
 	end = clock();
 	cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	if (cpu_time_used > 0.01) { // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
-		debug_print("WARNING: Loop ran for: %f secs\n",cpu_time_used);
+	if (cpu_time_used > max_cpu_time_used) { // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
+		max_cpu_time_used = cpu_time_used;
+
 	}
 	loops_timed++;
 	total_cpu_time_used += cpu_time_used;
 	if (total_cpu_time_used > LOOPS_TO_TIME) {
 		telem_thread_set_loop_time_10_mills(round(10000*total_cpu_time_used/loops_timed));
 		//verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
+		if (max_cpu_time_used > 0.01)
+			debug_print("WARNING: Loop ran for: %f secs\n",cpu_time_used);
 		total_cpu_time_used = 0;
+		max_cpu_time_used = 0;
 		loops_timed = 0;
 	}
 	return 0;
