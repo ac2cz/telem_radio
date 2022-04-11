@@ -34,6 +34,8 @@
 #include <assert.h>
 #include <iir_filter.h>
 #include <stdint.h>
+#include <math.h>
+#include <time.h>
 
 /* Libraries */
 #include <jack/jack.h>
@@ -48,6 +50,7 @@
 #include "telem_processor.h"
 #include "oscillator.h"
 #include "dc_filter.h"
+#include "telem_thread.h"
 
 /* Forward function declarations */
 double modulate_bit();
@@ -116,6 +119,18 @@ int zero_bits_in_a_row = 0;
 int one_bits_in_a_row = 0;
 int clipping_reported = 0;
 
+/* Audio loop timing variables */
+struct timespec ts_start, ts_end;
+double loop_time_microsec;
+double max_loop_time_microsec;
+double min_loop_time_microsec = 999999;
+int loops_timed = 0;
+double total_loop_time_microsec;
+#define LOOPS_TO_TIME 400.0  // Each loop is circa 10ms.  Time about once per telem frame
+
+double get_loop_time_microsec() { return loop_time_microsec; }
+double get_max_loop_time_microsec() { return max_loop_time_microsec; }
+double get_min_loop_time_microsec() { return min_loop_time_microsec; }
 
 /*
  * Turn the bit stream into samples that can be fed into the audio loop
@@ -256,6 +271,9 @@ jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 }
 
 jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes) {
+	/* Time the loop. Use clock_gettime because gettimeofday() is moved by NTP or other time sync mechanisms */
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
 	if (send_test_tone) {
 		for (int i=0; i < nframes; i++) {
 			double value = nextSample(&osc_phase, test_tone_freq, sample_rate, osc_sin_table, OSC_TABLE_SIZE);
@@ -290,6 +308,29 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 		duv_audio_loop(in, out, nframes);
 		clipping_reported = 0;
 	}
+
+	clock_gettime(CLOCK_MONOTONIC, &ts_end);
+	/* store the CPU time in microseconds */
+	loop_time_microsec = ((ts_end.tv_sec * 1000000 + ts_end.tv_nsec/1000) -
+			(ts_start.tv_sec * 1000000 + ts_start.tv_nsec/1000));
+
+	if (loop_time_microsec > max_loop_time_microsec)
+		max_loop_time_microsec = loop_time_microsec;
+	if (loop_time_microsec < min_loop_time_microsec)
+		min_loop_time_microsec = loop_time_microsec;
+	loops_timed++;
+	total_loop_time_microsec += loop_time_microsec;
+	if (loops_timed > LOOPS_TO_TIME) {
+		//verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
+		if (max_loop_time_microsec > 10000) // // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
+			debug_print("WARNING: Loop ran for: %.2f ms\n",max_loop_time_microsec/1000);
+		debug_print("Loop time: Max %.2fms Min: %.2fms\n",max_loop_time_microsec/1000,min_loop_time_microsec/1000);
+		total_loop_time_microsec = 0;
+		max_loop_time_microsec = 0;
+		min_loop_time_microsec = 99999;
+		loops_timed = 0;
+	}
+
 	return out;
 }
 

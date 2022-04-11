@@ -32,6 +32,10 @@
 #define DUV_PARITIES_LENGTH 32
 #define BITS_PER_10b_WORD 10
 
+/* Getters for variables */
+double get_loop_time_microsec();
+double get_max_loop_time_microsec();
+double get_min_loop_time_microsec();
 /*
  * Set the running disparity to zero.  This is called just once at startup,
  * but we may call it more than once if we are running test routines.

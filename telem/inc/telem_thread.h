@@ -41,11 +41,6 @@ void telem_thread_fill_next_packet();
 /* Find out which packet is ready to be sent */
 int telem_thread_get_packet_num();
 
-/* Store the average time that the audio loop takes in 10s of ms */
-void telem_thread_set_loop_time_10_mills(int value);
-/* Store the number of Xruns since we started */
-void telem_thread_set_xruns(int value);
-
 /* Test functions */
 int test_gather_duv_telemetry();
 

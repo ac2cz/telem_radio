@@ -51,12 +51,6 @@ pthread_mutex_t fill_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
 int fill_packet = true;
 int packet_num = 1; // The buffer that is ready to send.  Initialize to one so that on the first pass through we fill buffer zero
 
-/* telemetry parameters and their MUTEXs */
-pthread_mutex_t loop_time_mills_mutex = PTHREAD_MUTEX_INITIALIZER;
-int loop_time_mills; /* Average time that the audio loop takes to run */
-pthread_mutex_t xruns_mutex = PTHREAD_MUTEX_INITIALIZER;
-int xruns; /* Number of Xruns since we started */
-
 void telem_thread_process(void * arg) {
 	char *name;
 	name = (char *) arg;
@@ -104,18 +98,6 @@ void telem_thread_fill_next_packet() {
 
 int telem_thread_get_packet_num() {
 	return packet_num;
-}
-
-void telem_thread_set_loop_time_10_mills(int value) {
-	pthread_mutex_lock( &loop_time_mills_mutex );
-	loop_time_mills = value;
-	pthread_mutex_unlock( &loop_time_mills_mutex );
-}
-
-void telem_thread_set_xruns(int value) {
-	pthread_mutex_lock( &xruns_mutex );
-	xruns = value;
-	pthread_mutex_unlock( &xruns_mutex );
 }
 
 int gather_duv_telemetry(int type, duv_packet_t *packet) {
@@ -187,7 +169,7 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		sched_yield();
 
 		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
-		verbose_print("CPU temperature is %f degrees C\n",systemp/10.0);
+		verbose_print("CPU temperature is %.2f degrees C\n",systemp/10.0);
 
 		/* Frequency of the CPU - reading from this file sometimes causes an XRUN */
 		int value;
@@ -201,26 +183,21 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 			/* Value is in Hz.  We just want to know if it has dropped from 1.8MHz, so we just need 2 digits. */
 			packet->payload.cpu_speed = value / 100000;
 		}
-		verbose_print("CPU Speed is %f MHz\n",packet->payload.cpu_speed/10.0);
+		verbose_print("CPU Speed is %.2f MHz\n",packet->payload.cpu_speed/10.0);
 #ifdef RASPBERRY_PI
 #endif
 #ifndef LINUX
 		packet->payload.cpu_speed = 10;
-		verbose_print("CPU Speed is %f MHz\n",packet->payload.cpu_speed/10.0);
+		verbose_print("CPU Speed is %.2f MHz\n",packet->payload.cpu_speed/10.0);
 #endif
 
 		/* Audio loop time */
-		pthread_mutex_lock( &loop_time_mills_mutex );
-		packet->payload.loop_time = loop_time_mills;
-		verbose_print("Audio loop time %f ms\n",loop_time_mills/10.0);
-		pthread_mutex_unlock( &loop_time_mills_mutex );
+		packet->payload.loop_time = get_loop_time_microsec()/100;
+		verbose_print("Audio loop time %.2f ms\n",packet->payload.loop_time/10.0);
 
 		/* Xruns since we started running */
-		pthread_mutex_lock( &xruns_mutex );
-		packet->payload.xruns = xruns;
-		verbose_print("Xruns since start %i\n",xruns);
-		pthread_mutex_unlock( &xruns_mutex );
-
+		packet->payload.xruns = get_xruns_since_start();
+		verbose_print("Xruns since start %i\n",packet->payload.xruns);
 
 #ifdef RASPBERRY_PI
 

@@ -23,8 +23,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
-#include <sys/time.h>
 
 /* libraries */
 #include <jack/jack.h>
@@ -38,16 +36,9 @@
 jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
+static int xruns = 0;
 
-// Performance timing variables
-struct timeval start, end;
-double cpu_time_used;
-double max_cpu_time_used;
-double min_cpu_time_used = 999999;
-int loops_timed = 0;
-double total_cpu_time_used;
-#define LOOPS_TO_TIME 400.0  // Each loop is circa 10ms.  Time about once per telem frame
-
+int get_xruns_since_start() { return xruns; }
 
 /**
  * JACK calls this shutdown_callback if the server ever shuts down or
@@ -57,12 +48,10 @@ void jack_shutdown (void *arg) {
 	exit (1);
 }
 
+/* count xruns */
 int jack_xrun_callback(void *arg)  {
-	/* count xruns */
-	static int xruns = 0;
 	xruns += 1;
-	fprintf (stderr, "xrun %i \n", xruns);
-	telem_thread_set_xruns(xruns);
+	error_print("xrun %i \n", xruns);
 	return 0;
 }
 
@@ -76,7 +65,7 @@ int jack_xrun_callback(void *arg)  {
  *
  */
 int process_audio (jack_nframes_t nframes, void *arg) {
-	gettimeofday(&start, NULL);
+
 	assert(nframes == PERIOD_SIZE);
 	jack_default_audio_sample_t *in, *out;
 
@@ -85,29 +74,6 @@ int process_audio (jack_nframes_t nframes, void *arg) {
 
 	audio_loop(in, out, nframes);
 
-	gettimeofday(&end, NULL);
-	/* store the CPU time in microseconds */
-	cpu_time_used = ((end.tv_sec * 1000000 + end.tv_usec) -
-		    (start.tv_sec * 1000000 + start.tv_usec));
-	//cpu_time_used = ((double) (end - start)) / CLOCKS_PER_SEC;
-	if (cpu_time_used > max_cpu_time_used)
-		max_cpu_time_used = cpu_time_used;
-	if (cpu_time_used < min_cpu_time_used)
-		min_cpu_time_used = cpu_time_used;
-	loops_timed++;
-	total_cpu_time_used += cpu_time_used;
-	if (loops_timed > LOOPS_TO_TIME) {
-		telem_thread_set_loop_time_10_mills(round(total_cpu_time_used/loops_timed/1000.0));
-		//verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
-		if (max_cpu_time_used > 10000) // // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
-			debug_print("WARNING: Loop ran for: %f ms\n",max_cpu_time_used/1000);
-		debug_print("Max loop time: %f ms\n",max_cpu_time_used/1000);
-		debug_print("Min loop time: %f ms\n",min_cpu_time_used/1000);
-		total_cpu_time_used = 0;
-		max_cpu_time_used = 0;
-		min_cpu_time_used = 99999;
-		loops_timed = 0;
-	}
 	return 0;
 }
 
@@ -175,7 +141,7 @@ int start_jack_audio_processor (void) {
 	}
 
 	/* Tell the JACK server that we are ready to roll.  Our
-	 * process() callback will start running now. */
+	 * process() callback will loop_start_timeval running now. */
 	if (jack_activate (client)) {
 		error_print ("cannot activate client");
 		exit (1);
