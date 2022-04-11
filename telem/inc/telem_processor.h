@@ -1,5 +1,5 @@
 /*
- * telem_processor.c
+ * telem_processor.h
  *
  *  Created on: Feb 24, 2022
  *      Author: g0kla
@@ -17,9 +17,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
+ *
  */
-#ifndef TELEM_PROCESSOR_C_
-#define TELEM_PROCESSOR_C_
+#ifndef TELEM_PROCESSOR_H_
+#define TELEM_PROCESSOR_H_
 
 #include <stdint.h>
 #include <duv_telem_layout.h>
@@ -31,8 +32,6 @@
 #define DUV_PARITIES_LENGTH 32
 #define BITS_PER_10b_WORD 10
 
-duv_packet_t *telem_packet;  /* This is the raw data before it is RS encoded */
-
 /*
  * Set the running disparity to zero.  This is called just once at startup,
  * but we may call it more than once if we are running test routines.
@@ -42,17 +41,12 @@ void init_rd_state();
 /*
  * Ask the telem processor to set the a packet ready for transmission
  */
-int encode_next_packet(int packet_num);
+int encode_next_packet(duv_packet_t *packet, int encoded_packet_num);
 
 /**
  * Gather the telemetry data and store the next raw packet
  */
 int set_next_packet();
-
-/*
- * Takes an array of bytes as input and encodes them as 10 bits words with RS parities
- */
-void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet);
 
 /*
  * Get the next bit for the encoded packet.
@@ -78,4 +72,4 @@ int test_rs_encoder();
 int test_sync_word();
 int test_get_next_bit();
 
-#endif /* TELEM_PROCESSOR_C_ */
+#endif /* TELEM_PROCESSOR_H_ */

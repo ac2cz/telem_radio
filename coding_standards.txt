@@ -1,8 +1,17 @@
+TELEM_RADIO CODING GUIDELINES
+=============================
+Chris Thompson G0KLA
+
+These are suggested guidelines to keep the code consistent.
+
 Naming Conventions
 ~~~~~~~~~~~~~~~~~~
-All constants should be in CAPS
-All functions, variables should be in lowercase_with_underscores
-#typedefs should end with an _t e.g. duv_header_t 
+- All constants should be in CAPS
+- All functions should be in lowercase_with_underscores and ideally should 
+  start with the name of the file that they are declared in.  e.g. to declare
+  a start() function in telem_thread you should call it telem_thread_start()
+- All variables should be in lowercase_with_underscores
+- #typedefs should end with an _t e.g. duv_header_t 
 
 Formatting
 ~~~~~~~~~~
@@ -14,8 +23,7 @@ if (true) {
 
 Organization
 ~~~~~~~~~~~~
-Any c file that needs to share functions or constants should use a header
-file.  Only include function definitions for functions that need to be
+In header files only include function definitions for functions that need to be
 shared across files.  All other functions should be declared at the
 start of the C file with a forward definition.
 
@@ -49,4 +57,5 @@ Verbose output that may still be useful in the production code should use
 verbose_print(), this is only evident if the -v --verbose command line 
 switches are passed or if verbose is typed into the cmd console.
 
-Error statements should be printed with error_print.
+Error statements should be printed with error_print.  These are written
+to stderr and include the file name and line number.

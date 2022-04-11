@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
+ *
  * The telemetry processor encodes packets and supplies the bits to the
  * audio processor.
  *
@@ -37,12 +38,13 @@
 #include "telem_thread.h"
 
 /* Forward function definitions */
+void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet);
 
-/* Telemetry modulator settings */
+/* Telemetry modulator variables */
 unsigned char parities[DUV_PARITIES_LENGTH];   /* This is the parities calculated by the RS encoder */
 uint16_t encoded_packet[2][DUV_PACKET_LENGTH+1]; /* This is the 10b encoded packet with parities. It includes space for SYNC WORD at the end. */
 int current_encoded_packet_num = 0; /* We have two encoded packets.  One is being sent and the other is being built. */
-int buffer_ready[2] = {false, false};
+//int buffer_ready[2] = {false, false};
 
 /* This test packet is a 101010 sequence of 10b words */
 uint16_t encoded_packet_test1[] = {
@@ -69,10 +71,10 @@ void init_rd_state() {
 	rd_state = 0;
 }
 
-int encode_next_packet(int packet_num) {
+int encode_next_packet(duv_packet_t *packet, int encoded_packet_num) {
 	int rc = EXIT_SUCCESS;
 	debug_print("DEBUG: Getting next packet\n");
-	encode_duv_telem_packet((unsigned char *)telem_packet, encoded_packet[packet_num]);
+	encode_duv_telem_packet((unsigned char *)packet, encoded_packet[encoded_packet_num]);
 	return rc;
 }
 
@@ -93,7 +95,7 @@ int get_next_bit() {
 		// This is the start of sending a packets.
 		// Tell the telem thread to fill the next one
 		telem_thread_fill_next_packet();
-		debug_print("Starting to send packet: %i\n", current_encoded_packet_num);
+		debug_print("DEBUG: Starting to send packet: %i\n", current_encoded_packet_num);
 	}
 
 	if (bits_sent_for_current_word >= BITS_PER_10b_WORD) { // We are starting a new 10b word
@@ -108,7 +110,7 @@ int get_next_bit() {
 			words_sent_for_current_packet = 0;
 
 			int next_packet = telem_thread_get_packet_num();
-			debug_print("next packet: %i\n", next_packet);
+			debug_print("DEBUG: next packet: %i\n", next_packet);
 			if (next_packet == current_encoded_packet_num) {
 				error_print("Next packet was not available\n");
 				// TODO - we need to reset things here and send the sync word again.
@@ -157,7 +159,6 @@ void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet) {
 }
 
 int init_telemetry_processor() {
-	telem_packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 	first_packet_to_be_sent = true;
 	bits_sent_for_current_word = 0;
 	words_sent_for_current_packet = 0;
@@ -170,7 +171,7 @@ int init_telemetry_processor() {
  * Call this to free any memory allocated by the telemetry processor
  */
 void cleanup_telem_processor() {
-	free(telem_packet);
+
 }
 
 /******************************************************************************

@@ -17,6 +17,19 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
+ * The telem thread runs in the background and gathers new telemetry from the
+ * subsystems and sensors.  It stores the gathered telemetry in a packet and
+ * asks the telem_processor to encode it into the next available encoded packet
+ * buffer.  This stores a complete frame with RS Checkk bytes and a sync word.
+ *
+ * The telem thread waits until a new buffer is available before gathering the
+ * telemetry.  The telemetry processor triggers data collection by setting
+ * fill_packet = true.  But this can not be used to check if the data collection
+ * is finished because it is set to false as data collection begins.
+ *
+ * To determine if data collection is complete the telem processor should check
+ * which encoded packet buffer will be filled next.
+ *
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,7 +43,9 @@
 /* Forward function definitions */
 int gather_duv_telemetry(int type, duv_packet_t *packet);
 
-int called = 0;
+/* Telem thread variables */
+duv_packet_t *telem_packet;  /* This is the raw data before it is RS encoded */
+int called = false; /* true if we have already started the thread */
 int running = true;
 pthread_mutex_t fill_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
 int fill_packet = true;
@@ -45,8 +60,14 @@ int xruns; /* Number of Xruns since we started */
 void telem_thread_process(void * arg) {
 	char *name;
 	name = (char *) arg;
-	debug_print("Started: %s %d times\n", name, called);
+	if (called) {
+		error_print("Telem Thread already started.  Exiting: %s\n", name);
+		return;
+	}
 	called++;
+
+	/* Initialize */
+	telem_packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 
 	/* Run until stopped */
 	while (running) {
@@ -63,7 +84,7 @@ void telem_thread_process(void * arg) {
 				error_print("Error creating telemetry packet\n");
 			}
 
-			encode_next_packet(packet_buffer_to_fill);
+			encode_next_packet(telem_packet, packet_buffer_to_fill);
 
 			packet_num = packet_buffer_to_fill; /* This is now the next buffer available */
 		}
@@ -71,10 +92,14 @@ void telem_thread_process(void * arg) {
 		sched_yield();
 	}
 	debug_print("Exiting %s", name);
+	called--;
+	free(telem_packet);
 }
 
 void telem_thread_fill_next_packet() {
+	pthread_mutex_lock( &fill_packet_mutex );
 	fill_packet = true;
+	pthread_mutex_unlock( &fill_packet_mutex );
 }
 
 int telem_thread_get_packet_num() {
