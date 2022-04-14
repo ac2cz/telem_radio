@@ -56,6 +56,12 @@ int jack_xrun_callback(void *arg)  {
 	return 0;
 }
 
+void stop_jack() {
+	stop_cmd_console();
+	jack_client_close (client);
+	debug_print("Jack client disconnected\n");
+}
+
 /**
  * The process callback for this JACK application is called in a
  * special realtime thread once for each audio cycle.
@@ -125,8 +131,9 @@ int start_jack_audio_processor (void) {
 	/* Setup a callback to track XRUNS */
 	jack_set_xrun_callback(client, jack_xrun_callback, 0);
 
-	/* display the current sample rate */
-	g_sample_rate = jack_get_sample_rate (client);
+	/* check the current sample rate */
+	int rate = jack_get_sample_rate (client);
+	assert(rate == g_sample_rate);
 
 	/* create two ports */
 	input_port = jack_port_register (client, "input",
@@ -186,6 +193,7 @@ int start_jack_audio_processor (void) {
 	int rc = start_cmd_console();
 
 	jack_client_close (client);
+	debug_print("Jack client closed down\n");
 	return rc;
 }
 

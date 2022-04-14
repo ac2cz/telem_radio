@@ -21,7 +21,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
  *
- * This is the main program for telem_radio.
+ * This is the main program for telem_radio.  It handles command line paramaters and starts the
+ * telem_radio components.
+ * telem_processor
+ * telem_thread
+ * audio_processor
  *
  */
 
@@ -31,6 +35,7 @@
 #include <getopt.h>
 #include <pthread.h>
 #include <signal.h>
+#include <unistd.h>
 
 /* project include files */
 #include "config.h"
@@ -52,7 +57,7 @@
  *  GLOBAL VARIABLES defined here.  They are declared in config.h
  */
 int g_verbose = false;
-int g_sample_rate = 0;
+int g_sample_rate = 48000;
 int g_ramp_bits_to_compensate_hpf = true;
 
 /* local variables for this file */
@@ -67,12 +72,14 @@ int run_self_test() {
 	int fail = EXIT_SUCCESS;
 	printf("\nRunning Self Test..\n");
 	//rc = test_oscillator(); exit(1);
+
 	rc = test_rs_encoder();    if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_sync_word();     if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_get_next_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_modulate_bit();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;  ////////// WHY SOMETIMES FAILS??
 	rc = test_encode_packet();  if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
 	rc = test_gather_duv_telemetry(); if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE;
+
 	//	rc = test_audio_tools();   if (rc != EXIT_SUCCESS) fail = EXIT_FAILURE; // audio tools not currently used
 
 
@@ -130,8 +137,9 @@ void help(void) {
 void signal_handler (int sig) {
 	debug_print (" Signal received, exiting ...\n");
 
-	// EXIT THE CONSOLE AND STOP JACK
 	telem_thread_stop();
+	stop_jack();
+	sleep(500); // give jack time to close
 	cleanup_telem_processor();
 	exit (0);
 }
@@ -240,7 +248,7 @@ int main(int argc, char *argv[]) {
 
     rc = start_jack_audio_processor();
 
-     telem_thread_stop();
+    telem_thread_stop();
     cleanup_telem_processor();
 
 	printf("Exiting TELEM radio platform ..\n");

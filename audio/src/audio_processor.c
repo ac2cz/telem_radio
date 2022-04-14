@@ -484,12 +484,13 @@ int test_modulate_bit() {
 
 	/* reset the state of the modulator */
 	init_telemetry_processor();
-	samples_sent_for_current_bit = 0;
-	current_bit = 0;
-	init_rd_state();
+
+//	samples_sent_for_current_bit = 0;
+//	current_bit = 0;
 
 	g_sample_rate = 48000;
-	samples_per_duv_bit = g_sample_rate / DECIMATION_RATE / DUV_BPS;
+	init_audio_processor();
+//	samples_per_duv_bit = g_sample_rate / DECIMATION_RATE / DUV_BPS;
 
 	unsigned char *test_packet = set_test_packet();
 

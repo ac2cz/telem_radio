@@ -10,7 +10,7 @@
 
 /* Setup and start the jack audio thread */
 int start_jack_audio_processor (void);
-
+void stop_jack();
 int get_xruns_since_start();
 
 #endif /* JACK_AUDIO_H_ */

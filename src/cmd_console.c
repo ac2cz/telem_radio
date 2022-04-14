@@ -16,6 +16,8 @@
 #include "oscillator.h"
 #include "gpio_interface.h"
 
+int cmd_console_running = true;
+
 char *help_str =
 		"TELEM Radio Platform Console Commands:\n"
 		" (s)tatus   - display settings and status\n"
@@ -60,6 +62,8 @@ void print_full_status() {
 	print_status("Verbose Output", g_verbose);
 }
 
+void stop_cmd_console() { cmd_console_running = false; }
+
 /*
  * Start an interactive command console that allows the user to issue commands to the
  * telem_radio platform.  This should only be attached for lab testing.
@@ -76,8 +80,8 @@ int start_cmd_console() {
 		error_print("Unable to allocate line buffer");
 		exit(1);
 	}
-	int running = 1;
-	while (running) {
+
+	while (cmd_console_running) {
 		int rc = getline(&line, &buffer_size, stdin);
 		if (rc > 1) {
 			char * token;

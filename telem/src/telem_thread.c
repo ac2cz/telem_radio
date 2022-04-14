@@ -52,12 +52,17 @@ pthread_mutex_t fill_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
 int fill_packet = true;
 int packet_num = 1; // The buffer that is ready to send.  Initialize to one so that on the first pass through we fill buffer zero
 
-void telem_thread_process(void * arg) {
+/**
+ * Main process of the telem thread.  This is called when the pthread is created.
+ * It runs while the boolean running is true
+ *
+ */
+void *telem_thread_process(void * arg) {
 	char *name;
 	name = (char *) arg;
 	if (called) {
 		error_print("Telem Thread already started.  Exiting: %s\n", name);
-		return;
+		running = false;
 	}
 	called++;
 
