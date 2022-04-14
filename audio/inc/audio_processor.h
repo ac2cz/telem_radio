@@ -27,6 +27,9 @@
 /* the number of frames in each audio sample period.  This must match the period in ALSA */
 #define PERIOD_SIZE 480
 
+/* The reduction from 48000 samples per sec for the audio loop */
+#define DECIMATION_RATE 4
+
 /*
  * These values specify the strength of the telemetry.  They should be carefully calculated and set.
  * This should probably be in a configuration file.
@@ -37,8 +40,35 @@
 /* When bits have the same value ramp the amount up to compensate for HPF in the radio transmitter */
 #define RAMP_AMT 0.1 * ONE_VALUE
 
+double get_loop_time_microsec();
+double get_max_loop_time_microsec();
+double get_min_loop_time_microsec();
+int get_samples_per_duv_bit();
+double get_test_tone_freq();
+int get_hpf();
+int get_lpf_duv_bits();
+int get_send_duv_telem();
+int get_send_test_telem();
+int get_send_test_tone();
+int get_measure_test_tone();
+
+void set_samples_per_duv_bit(int val);
+void set_test_tone_freq(double val);
+void set_hpf(int val);
+void set_lpf_duv_bits(int val);
+void set_send_duv_telem(int val);
+void set_send_test_telem(int val);
+void set_send_test_tone(int val);
+void set_measure_test_tone(int val);
+
+/* The audio loop.  This is called from jackd or alsa hardware interface routines */
 jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes);
-int cmd_console();
+
+/* Create the filters and initialize ready to process audio.  Call this before jack is started */
+int init_audio_processor();
+
+/* Reset the modulator ready to send new telemetry */
+int init_bit_modulator();
 
 /*
  * Test functions

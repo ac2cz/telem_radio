@@ -42,7 +42,7 @@
             do { if (DEBUG) fprintf(stdout, fmt, ##__VA_ARGS__); } while (0)
 
 #define verbose_print(fmt, ...) \
-            if (verbose) fprintf(stdout, fmt, ##__VA_ARGS__);
+            if (g_verbose) fprintf(stdout, fmt, ##__VA_ARGS__);
 
 #define error_print(fmt, ...) \
             fprintf(stderr, "ERROR: %s:%d:%s(): " fmt, __FILE__, \

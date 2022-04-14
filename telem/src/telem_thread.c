@@ -61,6 +61,8 @@ void telem_thread_process(void * arg) {
 	}
 	called++;
 
+	debug_print("Starting Thread: %s\n", name);
+
 	/* Initialize */
 	telem_packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 
@@ -86,7 +88,7 @@ void telem_thread_process(void * arg) {
 		pthread_mutex_unlock( &fill_packet_mutex );
 		sched_yield();
 	}
-	debug_print("Exiting %s", name);
+	debug_print("Exiting Thread: %s\n", name);
 	called--;
 	free(telem_packet);
 }

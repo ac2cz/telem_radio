@@ -43,14 +43,12 @@ double get_min_loop_time_microsec();
 void init_rd_state();
 
 /*
- * Ask the telem processor to set the a packet ready for transmission
+ * Ask the telem processor to set the a packet ready for transmission.  it
+ * is encoded into the specified packet buffer.  The caller needs to know
+ * which buffer is available
+ *
  */
 int encode_next_packet(duv_packet_t *packet, int encoded_packet_num);
-
-/**
- * Gather the telemetry data and store the next raw packet
- */
-int set_next_packet();
 
 /*
  * Get the next bit for the encoded packet.

@@ -30,6 +30,7 @@
 /* Program */
 #include "config.h"
 #include "debug.h"
+#include "cmd_console.h"
 #include "audio_processor.h"
 #include "telem_thread.h"
 
@@ -125,7 +126,7 @@ int start_jack_audio_processor (void) {
 	jack_set_xrun_callback(client, jack_xrun_callback, 0);
 
 	/* display the current sample rate */
-	sample_rate = jack_get_sample_rate (client);
+	g_sample_rate = jack_get_sample_rate (client);
 
 	/* create two ports */
 	input_port = jack_port_register (client, "input",
@@ -182,7 +183,7 @@ int start_jack_audio_processor (void) {
 	free (ports);
 
 	/* keep running until stopped by the user, if we are in interactive mode.  Otherwise run until jack shutdown called. */
-	int rc = cmd_console();
+	int rc = start_cmd_console();
 
 	jack_client_close (client);
 	return rc;
