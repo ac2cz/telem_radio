@@ -20,6 +20,9 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
+ *
+ * This is the main program for telem_radio.
+ *
  */
 
 /* System include files */
@@ -47,10 +50,9 @@
 /*
  *  GLOBAL VARIABLES defined here.  They are declared in config.h
  */
-int verbose = false;
-int sample_rate = 0;
-unsigned short epoch = 0;
-int ramp_bits_to_compensate_hpf = true;
+int g_verbose = false;
+int g_sample_rate = 0;
+int g_ramp_bits_to_compensate_hpf = true;
 
 /* local variables for this file */
 pthread_t telem_pthread;
@@ -125,11 +127,11 @@ void help(void) {
 }
 
 void signal_handler (int sig) {
-	fprintf (stderr, " signal received, exiting ...\n");
+	debug_print (" Signal received, exiting ...\n");
 
 	// EXIT THE CONSOLE AND STOP JACK
-	//telem_thread_stop();
-	//cleanup_telem_processor();
+	telem_thread_stop();
+	cleanup_telem_processor();
 	exit (0);
 }
 
@@ -174,7 +176,7 @@ int main(int argc, char *argv[]) {
 			run_tests = true;
 			break;
 		case 'v': // verbose
-			verbose = true;
+			g_verbose = true;
 			break;
 		}
 	}
@@ -194,7 +196,11 @@ int main(int argc, char *argv[]) {
 #ifdef RASPBERRY_PI
 	if (!filter_test_num)
 		debug_print("Running on a Raspberry PI");
+
+	init_gpio();
+
 #endif
+
 #ifdef LINUX
 	if (!filter_test_num)
 		debug_print("Running on Linux");
@@ -225,9 +231,15 @@ int main(int argc, char *argv[]) {
 		exit(rc);
 	}
 
+	rc = init_audio_processor();
+	if (rc != EXIT_SUCCESS) {
+		error_print("Initialization error with audio processor\n");
+		return rc;
+	}
+
     rc = start_jack_audio_processor();
 
-    telem_thread_stop();
+     telem_thread_stop();
     cleanup_telem_processor();
 
 	printf("Exiting TELEM radio platform ..\n");
