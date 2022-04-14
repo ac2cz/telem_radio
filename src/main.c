@@ -38,6 +38,7 @@
 #include "jack_audio.h"
 #include "audio_processor.h"
 #include "telem_thread.h"
+#include "gpio_interface.h"
 
 /* Included for self tests */
 #include "iir_filter.h"
@@ -197,7 +198,7 @@ int main(int argc, char *argv[]) {
 	if (!filter_test_num)
 		debug_print("Running on a Raspberry PI");
 
-	init_gpio();
+	gpio_init();
 
 #endif
 
