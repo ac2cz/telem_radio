@@ -25,7 +25,7 @@
 #include <jack/jack.h>
 
 /* the number of frames in each audio sample period.  This must match the period in ALSA */
-#define PERIOD_SIZE 480
+#define PERIOD_SIZE 512
 
 /* The reduction from 48000 samples per sec for the audio loop */
 #define DECIMATION_RATE 4
