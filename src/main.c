@@ -139,7 +139,7 @@ void signal_handler (int sig) {
 
 	telem_thread_stop();
 	stop_jack();
-	sleep(500); // give jack time to close
+	sleep(1); // give jack time to close
 	cleanup_telem_processor();
 	exit (0);
 }
@@ -204,7 +204,7 @@ int main(int argc, char *argv[]) {
 
 #ifdef RASPBERRY_PI
 	if (!filter_test_num)
-		debug_print("Running on a Raspberry PI");
+		debug_print("Running on a Raspberry PI\n");
 
 	gpio_init();
 
@@ -212,7 +212,7 @@ int main(int argc, char *argv[]) {
 
 #ifdef LINUX
 	if (!filter_test_num)
-		debug_print("Running on Linux");
+		debug_print("Running on Linux\n");
 #endif
 
 

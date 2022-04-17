@@ -15,6 +15,7 @@
 #include "audio_processor.h"
 #include "oscillator.h"
 #include "gpio_interface.h"
+#include "duv_telem_layout.h"
 
 int cmd_console_running = true;
 
