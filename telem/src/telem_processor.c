@@ -61,6 +61,7 @@ uint16_t encoded_packet_test1[] = {
 		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0xfa
 };
 
+int packet_length = 0; // initialized at startup to equal the length of a packet.
 int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
 int bits_sent_for_current_word = 0; // how many bits have we sent for the current 10b word
 int words_sent_for_current_packet; // how many 10b words we have sent for the current packet
@@ -110,7 +111,7 @@ int get_next_bit() {
 			// we sent a word from this packet so increment the counter
 			words_sent_for_current_packet++;
 		}
-		if (words_sent_for_current_packet >= DUV_PACKET_LENGTH+1) { // We are ready for a new packet.  We have the sync word in the final word
+		if (words_sent_for_current_packet >= packet_length+1) { // We are ready for a new packet.  We have the sync word in the final word
 			words_sent_for_current_packet = 0;
 
 			int next_packet = telem_thread_get_packet_num();
@@ -162,7 +163,8 @@ void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet) {
 	encoded_packet[j] = encode_8b10b(&rd_state,-1); // Insert end-of-frame flag
 }
 
-int init_telemetry_processor() {
+int init_telemetry_processor(int packet_len) {
+	packet_length = packet_len;
 	first_packet_to_be_sent = true;
 	bits_sent_for_current_word = 0;
 	words_sent_for_current_packet = 0;
@@ -324,7 +326,7 @@ int test_get_next_bit() {
 	verbose_print("\n");
 
 	/* reset the state of the modulator */
-	init_telemetry_processor();
+	init_telemetry_processor(DUV_PACKET_LENGTH);
 	// but then set the test packet rather than the real telemetry that was captured
 	encode_duv_telem_packet(test_packet, encoded_packet[0]);
 

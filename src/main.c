@@ -128,7 +128,7 @@ void help(void) {
 			"Valid filter tests are:\n"
 			"    1 - high pass filter\n"
 			"    2 - FIR bit filter\n"
-			"use telem_radio/scripts/run_filter_test.sh to display the output in a graph"
+			"use telem_radio/scripts/run_filter_test.sh to display the output in a graph\n"
 #endif
 	);
 	exit(EXIT_SUCCESS);
@@ -195,9 +195,10 @@ int main(int argc, char *argv[]) {
 		return 0;
 	}
 
-	if (!filter_test_num)
+	if (!filter_test_num) {
 		printf("TELEM Radio Platform\n");
-	verbose_print("Build: %s\n", VERSION);
+	    printf("Build: %s\n", VERSION);
+	}
 	int rc = EXIT_SUCCESS;
 
 #ifdef DEBUG
@@ -227,7 +228,7 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
-	rc = init_telemetry_processor();
+	rc = init_telemetry_processor(DUV_PACKET_LENGTH);
 	if (rc != EXIT_SUCCESS) {
 		error_print("FATAL. Could not initialize the telemetry processor.\n");
 		exit(rc);
@@ -240,7 +241,8 @@ int main(int argc, char *argv[]) {
 		exit(rc);
 	}
 
-	rc = init_audio_processor();
+	rc = init_audio_processor(DUV_BPS,DECIMATION_RATE);
+//	rc = init_audio_processor(1200,1);
 	if (rc != EXIT_SUCCESS) {
 		error_print("Initialization error with audio processor\n");
 		return rc;

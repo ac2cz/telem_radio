@@ -43,20 +43,22 @@
 double get_loop_time_microsec();
 double get_max_loop_time_microsec();
 double get_min_loop_time_microsec();
-int get_samples_per_duv_bit();
+int get_samples_per_bit();
 double get_test_tone_freq();
 int get_hpf();
-int get_lpf_duv_bits();
-int get_send_duv_telem();
+int get_lpf_bits();
+int get_send_telem();
+int get_send_high_speed_telem();
 int get_send_test_telem();
 int get_send_test_tone();
 int get_measure_test_tone();
 
-void set_samples_per_duv_bit(int val);
+void set_samples_per_bit(int val);
 void set_test_tone_freq(double val);
 void set_hpf(int val);
-void set_lpf_duv_bits(int val);
-void set_send_duv_telem(int val);
+void set_lpf_bits(int val);
+void set_send_telem(int val);
+void set_send_high_speed_telem(int val);
 void set_send_test_telem(int val);
 void set_send_test_tone(int val);
 void set_measure_test_tone(int val);
@@ -65,10 +67,10 @@ void set_measure_test_tone(int val);
 jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes);
 
 /* Create the filters and initialize ready to process audio.  Call this before jack is started */
-int init_audio_processor();
+int init_audio_processor(int bit_rate, int decimation_rate);
 
 /* Reset the modulator ready to send new telemetry */
-int init_bit_modulator();
+int init_bit_modulator(int bit_rate, int decimation_rate);
 
 /*
  * Test functions

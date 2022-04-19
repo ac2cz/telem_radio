@@ -13,25 +13,31 @@
 #include "config.h"
 #include "debug.h"
 #include "audio_processor.h"
+#include "telem_processor.h"
 #include "oscillator.h"
 #include "gpio_interface.h"
 #include "duv_telem_layout.h"
+
+/* Forward function declarations */
+void print_status(char *name, int status);
+void print_full_status();
 
 int cmd_console_running = true;
 
 char *help_str =
 		"TELEM Radio Platform Console Commands:\n"
-		" (s)tatus   - display settings and status\n"
-		" (f)ilter   - Toggle high pass filter on/off\n"
+		" (s)tatus      - display settings and status\n"
+		" (f)ilter      - Toggle high pass filter on/off\n"
 		" (l)ow pass filter   - Toggle bit low high pass filter on/off\n"
-		" (t)elem    - Toggle DUV telemetry on/off\n"
-		" (p)tt      - Toggle the radio on/off\n"
-		" test       - DUV telem contains only 101010 on/off\n"
-		" tone       - Generate test tone\n"
-		" freq <Hz>  - Set freq of test tone\n"
-		" measure    - Display measurement for input tone\n"
-		" (h)help    - show this help\n"
-		" (q)uit     - Shutdown and exit\n\n";
+		" (t)elem       - Toggle DUV telemetry on/off\n"
+		" (hs)highspeed - Toggle High Speed telemetry on/off\n"
+		" (p)tt         - Toggle the radio on/off\n"
+		" test          - DUV telem contains only 101010 on/off\n"
+		" tone          - Generate test tone\n"
+		" freq <Hz>     - Set freq of test tone\n"
+		" measure       - Display measurement for input tone\n"
+		" (h)help       - show this help\n"
+		" (q)uit        - Shutdown and exit\n\n";
 
 
 /*
@@ -48,13 +54,14 @@ void print_status(char *name, int status) {
 void print_full_status() {
 	printf("TELEM Radio status:\n");
 	printf(" audio engine sample rate: %" PRIu32 "\n", g_sample_rate);
-	printf(" samples per DUV bit: %d\n", get_samples_per_duv_bit());
+	printf(" samples per bit: %d\n", get_samples_per_bit());
 	int rate = g_sample_rate/DECIMATION_RATE;
 	printf(" decimation factor: %d with audio loop sample rate %d\n",DECIMATION_RATE, rate);
 	printf(" test tone freq %d Hz\n",(int)get_test_tone_freq());
 	print_status("High Pass Filter", get_hpf());
-	print_status("Bit Low Pass Filter", get_lpf_duv_bits());
-	print_status("DUV Telemetry", get_send_duv_telem());
+	print_status("Bit Low Pass Filter", get_lpf_bits());
+	print_status("DUV Telemetry", get_send_telem());
+	print_status("High Speed Telemetry", get_send_high_speed_telem());
 	print_status("Test Telem", get_send_test_telem());
 	print_status("Transmitter", gpio_get_ptt());
 
@@ -93,17 +100,27 @@ int start_cmd_console() {
 				set_hpf(!get_hpf());
 				print_status("High Pass Filter", get_hpf());
 			} else if (strcmp(token, "low") == 0 || strcmp(token, "l") == 0) {
-				set_lpf_duv_bits(!get_lpf_duv_bits());
-				print_status("Bit Low Pass Filter", get_lpf_duv_bits());
+				set_lpf_bits(!get_lpf_bits());
+				print_status("Bit Low Pass Filter", get_lpf_bits());
 			} else if (strcmp(token, "telem") == 0 || strcmp(token, "t") == 0) {
-				set_send_duv_telem(!get_send_duv_telem());
-				if (get_send_duv_telem() == false) { // reset the modulator ready for next time
-					rc = init_bit_modulator();
+				set_send_telem(!get_send_telem());
+				if (get_send_telem() == true) { // reset the modulator
+					rc = init_bit_modulator(DUV_BPS, 4);
 					if (rc != EXIT_SUCCESS) {
-						error_print("Issue initializing the but modulator.  It may not work correctly..");
+						error_print("Issue initializing the modulator.  It may not work correctly..");
 					}
 				}
-				print_status("Telemetry", get_send_duv_telem());
+				print_status("Telemetry", get_send_telem());
+			} else if (strcmp(token, "highspeed") == 0 || strcmp(token, "hs") == 0) {
+				set_send_high_speed_telem(!get_send_high_speed_telem());
+				set_send_telem(get_send_high_speed_telem());
+				if (get_send_high_speed_telem() == true) { // reset the modulator
+					rc = init_bit_modulator(FSK_1200_BPS*DECIMATION_RATE, 1);
+					if (rc != EXIT_SUCCESS) {
+						error_print("Issue initializing the high speed bit modulator.  It may not work correctly..");
+					}
+				}
+				print_status("Telemetry", get_send_telem());
 			} else if (strcmp(token, "ptt") == 0 || strcmp(token, "p") == 0) {
 				gpio_set_ptt(!gpio_get_ptt());
 				print_status("Transmitter", gpio_get_ptt());

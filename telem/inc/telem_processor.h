@@ -30,6 +30,12 @@
 #define DUV_PACKET_LENGTH 96  /* 4 header bytes, 60 payload bytes, 32 check bytes */
 #define DUV_DATA_LENGTH 64
 #define DUV_PARITIES_LENGTH 32
+
+#define FSK_1200_BPS 200
+#define FSK_1200_PACKET_LENGTH 96  /* 4 header bytes, 60 payload bytes, 32 check bytes */
+#define FSK_1200_DATA_LENGTH 64
+#define FSK_1200_PARITIES_LENGTH 32
+
 #define BITS_PER_10b_WORD 10
 
 /* Getters for variables */
@@ -60,7 +66,7 @@ int get_next_bit();
  * whenever the telemetry is stopped and restarted.  Cleanup should be called when
  * it is no longer needed
  */
-int init_telemetry_processor();
+int init_telemetry_processor(int packet_len);
 void cleanup_telem_processor();
 
 /*

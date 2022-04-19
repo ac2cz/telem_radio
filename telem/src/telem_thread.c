@@ -196,9 +196,8 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 			/* Value is in Hz.  We just want to know if it has dropped from 1.8MHz, so we just need 2 digits. */
 			packet->payload.cpu_speed = value / 100000;
 		}
-		verbose_print("CPU Speed is %.2f MHz\n",packet->payload.cpu_speed/10.0);
-
-		print_duv_packet(packet);
+		if (g_verbose)
+			print_duv_packet(packet);
 #ifdef RASPBERRY_PI
 #endif
 #ifndef LINUX

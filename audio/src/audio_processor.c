@@ -54,13 +54,9 @@
 
 /* Forward function declarations */
 double modulate_bit();
-int init_bit_modulator();
 jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 		jack_default_audio_sample_t *out, jack_nframes_t nframes);
-int init();
-int init_filters();
-void print_status(char *name, int status);
-void print_full_status();
+int init_filters(int bit_rate, int decimation_rate);
 
 /* Test tone parameters */
 #define OSC_TABLE_SIZE 9600
@@ -83,9 +79,9 @@ double decimate_filter_xv[DECIMATE_FILTER_LEN];
 double interpolate_filter_coeffs[DECIMATE_FILTER_LEN];
 double interpolate_filter_xv[DECIMATE_FILTER_LEN];
 
-#define DUV_BIT_FILTER_LEN 180 // 60 is one bit.  Filter across 3 bits seems to be a good trade off
-double duv_bit_filter_coeffs[DUV_BIT_FILTER_LEN];
-double duv_bit_filter_xv[DUV_BIT_FILTER_LEN];
+#define BIT_FILTER_LEN 180 // 60 is one bit.  Filter across 3 bits seems to be a good trade off
+double bit_filter_coeffs[BIT_FILTER_LEN];
+double bit_filter_xv[BIT_FILTER_LEN];
 
 double filtered_audio_buffer[PERIOD_SIZE]; // the audio samples after they are filtered by the decimation filter
 double decimated_audio_buffer[PERIOD_SIZE/4]; // the audio samples after decimation and decimation filter
@@ -97,18 +93,19 @@ TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff;
 TIIRStorage iir_hpf_store; // storage for the IIR High Pass filter
 
 /* Telemetry modulator settings */
-int samples_per_duv_bit = 0; // this is calculated in the code.  For example it is 12000/200 = 60
+int samples_per_bit = 0; // this is calculated in the code.  For example it is 12000/200 = 60
 int samples_sent_for_current_bit = 0; // how many samples have we sent for the current bit
 int current_bit = 0; // the value of the current bit we are sending
 int starting_bit_modulator = true;
 
 /* User settings changeable from cmd console */
 int hpf = true; // filter the transponder audio
-int send_duv_telem = false;
+int send_telem = false;
+int send_high_speed_telem = false;
 int send_test_telem = false; // send a 10101 test telem sequence
 int send_test_tone = false; // output a steady tone for measurement of a sound card
 int measure_test_tone = false; // display the peak ampltude of a received tone to measure the sound card
-int lpf_duv_bits = true;  // filter the DUV telem bits
+int lpf_bits = true;  // filter the telem bits
 
 /* Setup the test bit pattern.  Send this many bits in a row. */
 int TEST_BIT_NUMBER = 5;
@@ -131,20 +128,22 @@ double get_loop_time_microsec() { return loop_time_microsec; }
 double get_max_loop_time_microsec() { return max_loop_time_microsec; }
 double get_min_loop_time_microsec() { return min_loop_time_microsec; }
 
-int get_samples_per_duv_bit() { return samples_per_duv_bit; }
+int get_samples_per_bit() { return samples_per_bit; }
 double get_test_tone_freq() { return test_tone_freq; }
 int get_hpf() { return hpf; }
-int get_lpf_duv_bits() { return lpf_duv_bits; }
-int get_send_duv_telem() { return send_duv_telem; }
+int get_lpf_bits() { return lpf_bits; }
+int get_send_telem() { return send_telem; }
+int get_send_high_speed_telem() { return send_high_speed_telem; }
 int get_send_test_telem() { return send_test_telem; }
 int get_send_test_tone() { return send_test_tone; }
 int get_measure_test_tone() { return measure_test_tone; }
 
-void set_samples_per_duv_bit(int val) { samples_per_duv_bit = val; }
+void set_samples_per_bit(int val) { samples_per_bit = val; }
 void set_test_tone_freq(double val) { test_tone_freq = val; }
 void set_hpf(int val) { hpf = val; }
-void set_lpf_duv_bits(int val) { lpf_duv_bits = val; }
-void set_send_duv_telem(int val) { send_duv_telem = val; }
+void set_lpf_bits(int val) { lpf_bits = val; }
+void set_send_telem(int val) { send_telem = val; }
+void set_send_high_speed_telem(int val) { send_high_speed_telem = val; }
 void set_send_test_telem(int val) { send_test_telem = val; }
 void set_send_test_tone(int val) { send_test_tone = val; }
 void set_measure_test_tone(int val) { measure_test_tone = val; }
@@ -155,7 +154,7 @@ void set_measure_test_tone(int val) { measure_test_tone = val; }
  */
 double modulate_bit() {
 	if (starting_bit_modulator ||  // starting a new packet
-			(samples_sent_for_current_bit >= samples_per_duv_bit )) { // We are starting a new bit
+			(samples_sent_for_current_bit >= samples_per_bit )) { // We are starting a new bit
 		samples_sent_for_current_bit = 0;
 		starting_bit_modulator = false;
 		if (send_test_telem) {
@@ -177,22 +176,24 @@ double modulate_bit() {
 	}
 	samples_sent_for_current_bit++;
 	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
-	if (g_ramp_bits_to_compensate_hpf) {
+	if (!send_high_speed_telem && g_ramp_bits_to_compensate_hpf) {
 		if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * RAMP_AMT;
 		if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * RAMP_AMT;
 	}
 
-	if (lpf_duv_bits)
-		bit_audio_value = fir_filter(bit_audio_value, duv_bit_filter_coeffs, duv_bit_filter_xv, DUV_BIT_FILTER_LEN);
+	if (lpf_bits)
+		bit_audio_value = fir_filter(bit_audio_value, bit_filter_coeffs, bit_filter_xv, BIT_FILTER_LEN);
 
 	return bit_audio_value;
 }
 
-int init_bit_modulator() {
+int init_bit_modulator(int bit_rate, int decimation_rate) {
 	starting_bit_modulator = true;
 	current_bit = 0;
 	samples_sent_for_current_bit = 0;
-	samples_per_duv_bit = g_sample_rate / DECIMATION_RATE / DUV_BPS;
+	// TODO HIGH SPEED
+////////////	samples_per_bit = g_sample_rate / bit_rate;
+	samples_per_bit = g_sample_rate / decimation_rate / bit_rate;
 	return EXIT_SUCCESS;
 }
 
@@ -201,13 +202,32 @@ jack_default_audio_sample_t * telem_only_audio_loop(jack_default_audio_sample_t 
 
 
 	for (int i = 0; i< nframes; i++) {
-		if (send_duv_telem) {
+		if (send_telem) {
 			float bit_audio_value = modulate_bit();
 			out[i] = bit_audio_value; // add the telemetry
 		} else {
 			out[i] = 0.0;
 		}
 	}
+	return out;
+}
+
+jack_default_audio_sample_t * high_speed_telem_audio_loop(jack_default_audio_sample_t *in,
+		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
+
+
+	if (send_telem) {
+		for (int i = 0; i< nframes; i++) {
+			float bit_audio_value = modulate_bit();
+			out[i] = bit_audio_value; // add the telemetry
+			if (!clipping_reported)
+				if (out[i] > 1.0) {
+					error_print("Audio is clipping! %f",out[i]);
+					clipping_reported = 1;
+				}
+		}
+	}
+
 	return out;
 }
 
@@ -252,7 +272,7 @@ jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
 	/**
 	 * Insert DUV telemetry.
 	 */
-	if (send_duv_telem) {
+	if (send_telem) {
 		for (int i = 0; i< nframes/DECIMATION_RATE; i++) {
 			float bit_audio_value = modulate_bit();
 			hpf_decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
@@ -318,6 +338,9 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 			measurements = 0;
 			peak_value = 0;
 		}
+	} else if (send_high_speed_telem) {
+		high_speed_telem_audio_loop(in, out, nframes);
+		clipping_reported = 0;
 	} else {
 		/*
 		 * Now process the data in out buffer before we sent it to the radio
@@ -355,18 +378,18 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 /*
  * This initializes the audio processor and should be called when it is first started
  */
-int init_audio_processor() {
+int init_audio_processor(int bit_rate, int decimation_rate) {
 	// Init
 	/* Encode first packet */
 	int rc;
-	rc = init_bit_modulator();
+	rc = init_bit_modulator(bit_rate, decimation_rate);
 	if (rc != 0) {
 		error_print("Error initializing bit modulator\n");
 		return rc;
 	}
 
 	/* now we know the sample rate then setup things that are dependent on that */
-	rc = init_filters();
+	rc = init_filters(bit_rate, decimation_rate);
 	if (rc != 0) {
 		error_print("Error initializing filters\n");
 		return rc;
@@ -383,11 +406,11 @@ int init_audio_processor() {
 /*
  * This is called at startup to populate the coefficients for digital filters
  */
-int init_filters() {
+int init_filters(int bit_rate, int decimation_rate) {
 	verbose_print("Generating filters ..\n");
 
 	/* Decimation filter */
-	int decimation_cutoff_freq = g_sample_rate / (2* DECIMATION_RATE);
+	int decimation_cutoff_freq = g_sample_rate / (2* decimation_rate);
 	int rc = gen_raised_cosine_coeffs(decimate_filter_coeffs, g_sample_rate, decimation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	for (int i=0; i< DECIMATE_FILTER_LEN; i++) decimate_filter_xv[i] = 0;
 
@@ -401,6 +424,11 @@ int init_filters() {
 		iir_hpf_store.RegY1[i] = 0.0;
 		iir_hpf_store.RegY2[i] = 0.0;
 	}
+
+	/*
+	 * Note that the IIR filters are tied to a decimated sample rate of 12kHz and need to be redefined if the
+	 * decimation rate is different
+	 */
 
 	/* High pass filter Cutoff 0.05 - 300Hz at 12k, 8 poles, 0.1dB ripple, 80dB stop band */
 	Elliptic8Pole300HzHighPassIIRCoeff = (TIIRCoeff) {
@@ -435,16 +463,17 @@ int init_filters() {
 	};
 
 	/* Interpolation filter */
-	int interpolation_cutoff_freq = g_sample_rate / (2* DECIMATION_RATE);
+	int interpolation_cutoff_freq = g_sample_rate / (2* decimation_rate);
 	for (int i=0; i< DECIMATE_FILTER_LEN; i++) interpolate_filter_xv[i] = 0;
 	rc = gen_raised_cosine_coeffs(interpolate_filter_coeffs, g_sample_rate, interpolation_cutoff_freq, 0.5f, DECIMATE_FILTER_LEN);
 	if (rc != 0)
 		return rc;
 
 	/* Bit shape filter */
-	int duv_bit_cutoff_freq = 200;
-	for (int i=0; i< DUV_BIT_FILTER_LEN; i++) duv_bit_filter_xv[i] = 0;
-	rc = gen_raised_cosine_coeffs(duv_bit_filter_coeffs, g_sample_rate/DECIMATION_RATE, duv_bit_cutoff_freq, 0.5f, DUV_BIT_FILTER_LEN);
+	for (int i=0; i< BIT_FILTER_LEN; i++) bit_filter_xv[i] = 0;
+	// TODO HIGH SPEED
+//////	rc = gen_raised_cosine_coeffs(bit_filter_coeffs, g_sample_rate, bit_rate, 0.5f, BIT_FILTER_LEN);
+	rc = gen_raised_cosine_coeffs(bit_filter_coeffs, g_sample_rate/decimation_rate, bit_rate, 0.5f, BIT_FILTER_LEN);
 
 	return rc;
 }
@@ -462,9 +491,9 @@ unsigned char test_parities_check[] = {0x19,0xa0,0x2c,0x20,0x59,0xf6,0x7c,0x12,0
 int test_modulate_bit() {
 	printf("TESTING modulate_bit .. ");
 	verbose_print("\n");
-	int lpf = lpf_duv_bits; // store this value to reset after the test
+	int lpf = lpf_bits; // store this value to reset after the test
 	int ramp = g_ramp_bits_to_compensate_hpf; // store this value to reset after the test
-	lpf_duv_bits = false; // turn this off just for the test
+	lpf_bits = false; // turn this off just for the test
 	g_ramp_bits_to_compensate_hpf = false;// turn this off just for the test
 
 	int fail = 0;
@@ -483,13 +512,13 @@ int test_modulate_bit() {
 			0,0,1,1,0,0,0,1,1,0};
 
 	/* reset the state of the modulator */
-	init_telemetry_processor();
+	init_telemetry_processor(DUV_PACKET_LENGTH);
 
 //	samples_sent_for_current_bit = 0;
 //	current_bit = 0;
 
 	g_sample_rate = 48000;
-	init_audio_processor();
+	init_audio_processor(DUV_BPS, DECIMATION_RATE);
 //	samples_per_duv_bit = g_sample_rate / DECIMATION_RATE / DUV_BPS;
 
 	unsigned char *test_packet = set_test_packet();
@@ -501,9 +530,9 @@ int test_modulate_bit() {
 
 	/* Run for whole first word, the sync word and check that the first and last sample of each bit is correct
 	 * This is 10 bits */
-	for (int i=0; i < 10*samples_per_duv_bit; i++) {
+	for (int i=0; i < 10*samples_per_bit; i++) {
 		double bit_audio_value = modulate_bit();
-		if ((i) % samples_per_duv_bit == 0) {
+		if ((i) % samples_per_bit == 0) {
 			// first sample of bit
 			verbose_print ("%.3f ",bit_audio_value);
 			double test_value = expected_result1[j] ? ONE_VALUE : ZERO_VALUE;
@@ -512,7 +541,7 @@ int test_modulate_bit() {
 				fail = 1;
 			}
 		}
-		if ((i+1) % samples_per_duv_bit == 0) {
+		if ((i+1) % samples_per_bit == 0) {
 			// last sample of bit
 			//printf ("%.3f ",i, bit_audio_value);
 			double test_value = expected_result1[j++] ? ONE_VALUE : ZERO_VALUE;
@@ -537,10 +566,10 @@ int test_modulate_bit() {
 			check_expected_results = true; // now we check the first 40 bits of the second packet, inc sync word
 		}
 		verbose_print ("w:%d ",w);
-		for (int i=0; i < 10*samples_per_duv_bit; i++) { // 600 samples is a whole word
+		for (int i=0; i < 10*samples_per_bit; i++) { // 600 samples is a whole word
 			double bit_audio_value = modulate_bit();
 
-			if ((i) % samples_per_duv_bit == 0) {
+			if ((i) % samples_per_bit == 0) {
 				verbose_print ("%.3f ",bit_audio_value);
 				if (check_expected_results) {
 					double test_value = expected_result2[j++] ? ONE_VALUE : ZERO_VALUE;
@@ -578,7 +607,7 @@ int test_modulate_bit() {
 		decode = 0;
 		b = 9;
 	}
-	lpf_duv_bits = lpf; // reset this after the test
+	lpf_bits = lpf; // reset this after the test
 	g_ramp_bits_to_compensate_hpf = ramp; // reset after the test
 	if (fail == 0) {
 		printf(" Pass\n");

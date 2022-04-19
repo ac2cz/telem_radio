@@ -10,7 +10,7 @@
 
 #include "debug.h"
 
-#define VERSION __DATE__ " - Version 0.3"
+#define VERSION __DATE__ " - Version 0.4"
 #define DEBUG 1
 #define true 1
 #define false 0
