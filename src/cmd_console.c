@@ -158,6 +158,9 @@ int start_cmd_console() {
 	}
 	free(line);
 	printf("Stopping audio processor ..\n");
+	/* Make sure the transmitter is off as we exit */
+	gpio_set_ptt(LOW);
+	print_status("Transmitter", gpio_get_ptt());
 
 	return 0;
 }

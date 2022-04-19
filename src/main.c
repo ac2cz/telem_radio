@@ -241,8 +241,8 @@ int main(int argc, char *argv[]) {
 		exit(rc);
 	}
 
-	rc = init_audio_processor(DUV_BPS,DECIMATION_RATE);
-//	rc = init_audio_processor(1200,1);
+//	rc = init_audio_processor(DUV_BPS,DECIMATION_RATE);
+	rc = init_audio_processor(1200,1);
 	if (rc != EXIT_SUCCESS) {
 		error_print("Initialization error with audio processor\n");
 		return rc;

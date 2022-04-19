@@ -100,8 +100,8 @@ int starting_bit_modulator = true;
 
 /* User settings changeable from cmd console */
 int hpf = true; // filter the transponder audio
-int send_telem = false;
-int send_high_speed_telem = false;
+int send_telem = true;
+int send_high_speed_telem = true;
 int send_test_telem = false; // send a 10101 test telem sequence
 int send_test_tone = false; // output a steady tone for measurement of a sound card
 int measure_test_tone = false; // display the peak ampltude of a received tone to measure the sound card
