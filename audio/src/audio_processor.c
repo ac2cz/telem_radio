@@ -191,10 +191,17 @@ int init_bit_modulator(int bit_rate, int decimation_rate) {
 	starting_bit_modulator = true;
 	current_bit = 0;
 	samples_sent_for_current_bit = 0;
-	// TODO HIGH SPEED
-////////////	samples_per_bit = g_sample_rate / bit_rate;
+
 	samples_per_bit = g_sample_rate / decimation_rate / bit_rate;
-	return EXIT_SUCCESS;
+
+	/* now we know the sample rate then setup things that are dependent on that */
+	int rc = init_filters(bit_rate, decimation_rate);
+	if (rc != 0) {
+		error_print("Error initializing filters\n");
+		return rc;
+	}
+
+	return rc;
 }
 
 jack_default_audio_sample_t * telem_only_audio_loop(jack_default_audio_sample_t *in,
@@ -380,21 +387,8 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
  */
 int init_audio_processor(int bit_rate, int decimation_rate) {
 	// Init
-	/* Encode first packet */
+
 	int rc;
-	rc = init_bit_modulator(bit_rate, decimation_rate);
-	if (rc != 0) {
-		error_print("Error initializing bit modulator\n");
-		return rc;
-	}
-
-	/* now we know the sample rate then setup things that are dependent on that */
-	rc = init_filters(bit_rate, decimation_rate);
-	if (rc != 0) {
-		error_print("Error initializing filters\n");
-		return rc;
-	}
-
 	/* Initialize a sine table in the oscillator */
 	rc = gen_cos_table(osc_sin_table, OSC_TABLE_SIZE);
 	if (rc != 0)

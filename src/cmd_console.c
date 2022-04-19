@@ -105,7 +105,7 @@ int start_cmd_console() {
 			} else if (strcmp(token, "telem") == 0 || strcmp(token, "t") == 0) {
 				set_send_telem(!get_send_telem());
 				if (get_send_telem() == true) { // reset the modulator
-					rc = init_bit_modulator(DUV_BPS, 4);
+					rc = init_bit_modulator(DUV_BPS, DECIMATION_RATE);
 					if (rc != EXIT_SUCCESS) {
 						error_print("Issue initializing the modulator.  It may not work correctly..");
 					}
@@ -158,6 +158,8 @@ int start_cmd_console() {
 	}
 	free(line);
 	printf("Stopping audio processor ..\n");
-
+	/* Make sure the TX is off as we shutdown */
+	gpio_set_ptt(LOW);
+	print_status("Transmitter", gpio_get_ptt());
 	return 0;
 }
