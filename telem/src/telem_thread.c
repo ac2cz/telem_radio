@@ -20,7 +20,7 @@
  * The telem thread runs in the background and gathers new telemetry from the
  * subsystems and sensors.  It stores the gathered telemetry in a packet and
  * asks the telem_processor to encode it into the next available encoded packet
- * buffer.  This stores a complete frame with RS Checkk bytes and a sync word.
+ * buffer.  This stores a complete frame with RS Check bytes and a sync word.
  *
  * The telem thread waits until a new buffer is available before gathering the
  * telemetry.  The telemetry processor triggers data collection by setting

@@ -28,7 +28,7 @@
 #define PERIOD_SIZE 512
 
 /* The reduction from 48000 samples per sec for the audio loop */
-#define DECIMATION_RATE 4
+#define DUV_DECIMATION_RATE 4
 
 /*
  * These values specify the strength of the telemetry.  They should be carefully calculated and set.
@@ -40,6 +40,8 @@
 /* When bits have the same value ramp the amount up to compensate for HPF in the radio transmitter */
 #define RAMP_AMT 0.1 * ONE_VALUE
 
+/* Access to variables needed by other files */
+int get_decimation_rate();
 double get_loop_time_microsec();
 double get_max_loop_time_microsec();
 double get_min_loop_time_microsec();

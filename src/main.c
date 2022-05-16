@@ -21,11 +21,15 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
  *
- * This is the main program for telem_radio.  It handles command line paramaters and starts the
- * telem_radio components.
- * telem_processor
- * telem_thread
- * audio_processor
+ * This is the main program for telem_radio.  It handles command line parameters and starts the
+ * telem_radio components:
+ * 	telem_processor - The telemetry processor encodes packets and supplies the bits to the
+ *                    audio processor.
+ * 	telem_thread    - The telem thread runs in the background and gathers new telemetry from the
+ *                    subsystems and sensors.
+ * 	audio_processor - This is an audio loop that reads audio from the sound card, processes it and
+ * 	                  then writes it back to the sound card.
+ *
  *
  */
 
@@ -241,18 +245,27 @@ int main(int argc, char *argv[]) {
 		exit(rc);
 	}
 
-//	rc = init_audio_processor(DUV_BPS,DECIMATION_RATE);
-	rc = init_audio_processor(1200,1);
+	rc = init_audio_processor(DUV_BPS,DUV_DECIMATION_RATE);
+//	rc = init_audio_processor(FSK_1200_BPS,1);
 	if (rc != EXIT_SUCCESS) {
 		error_print("Initialization error with audio processor\n");
 		return rc;
 	}
 
     rc = start_jack_audio_processor();
-
+    if (rc != EXIT_SUCCESS) {
+    		error_print("FATAL. Could not start the jack audio thread.\n");
+    		exit(rc);
+    	}
+    rc = start_cmd_console();
+    if (rc != EXIT_SUCCESS) {
+    	error_print("FATAL. Could not start the command console.\n");
+    	exit(rc);
+    }
     telem_thread_stop();
     cleanup_telem_processor();
 
 	printf("Exiting TELEM radio platform ..\n");
+	stop_jack_audio_processor();
 	return rc;
 }

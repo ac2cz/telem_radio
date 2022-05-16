@@ -92,6 +92,9 @@ TIIRCoeff Elliptic8Pole300HzHighPassIIRCoeff;
 TIIRCoeff Elliptic4Pole300HzHighPassIIRCoeff;
 TIIRStorage iir_hpf_store; // storage for the IIR High Pass filter
 
+/* Audio processor variables */
+int decimation_rate;
+
 /* Telemetry modulator settings */
 int samples_per_bit = 0; // this is calculated in the code.  For example it is 12000/200 = 60
 int samples_sent_for_current_bit = 0; // how many samples have we sent for the current bit
@@ -101,7 +104,7 @@ int starting_bit_modulator = true;
 /* User settings changeable from cmd console */
 int hpf = true; // filter the transponder audio
 int send_telem = true;
-int send_high_speed_telem = true;
+int send_high_speed_telem = false;
 int send_test_telem = false; // send a 10101 test telem sequence
 int send_test_tone = false; // output a steady tone for measurement of a sound card
 int measure_test_tone = false; // display the peak ampltude of a received tone to measure the sound card
@@ -128,6 +131,7 @@ double get_loop_time_microsec() { return loop_time_microsec; }
 double get_max_loop_time_microsec() { return max_loop_time_microsec; }
 double get_min_loop_time_microsec() { return min_loop_time_microsec; }
 
+int get_decimation_rate() { return decimation_rate; }
 int get_samples_per_bit() { return samples_per_bit; }
 double get_test_tone_freq() { return test_tone_freq; }
 int get_hpf() { return hpf; }
@@ -148,240 +152,14 @@ void set_send_test_telem(int val) { send_test_telem = val; }
 void set_send_test_tone(int val) { send_test_tone = val; }
 void set_measure_test_tone(int val) { measure_test_tone = val; }
 
-
-/*
- * Turn the bit stream into samples that can be fed into the audio loop
- */
-double modulate_bit() {
-	if (starting_bit_modulator ||  // starting a new packet
-			(samples_sent_for_current_bit >= samples_per_bit )) { // We are starting a new bit
-		samples_sent_for_current_bit = 0;
-		starting_bit_modulator = false;
-		if (send_test_telem) {
-			test_bits_sent++;
-			if (test_bits_sent == TEST_BIT_NUMBER) {
-				current_bit = !current_bit; // TESTING - just toggle the bit to generate tone
-				test_bits_sent = 0;
-			}
-		} else
-			current_bit = get_next_bit();
-
-		if (current_bit) {
-			one_bits_in_a_row++;
-			zero_bits_in_a_row = 0;
-		} else {
-			one_bits_in_a_row = 0;
-			zero_bits_in_a_row++;
-		}
-	}
-	samples_sent_for_current_bit++;
-	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
-	if (!send_high_speed_telem && g_ramp_bits_to_compensate_hpf) {
-		if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * RAMP_AMT;
-		if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * RAMP_AMT;
-	}
-
-	if (lpf_bits)
-		bit_audio_value = fir_filter(bit_audio_value, bit_filter_coeffs, bit_filter_xv, BIT_FILTER_LEN);
-
-	return bit_audio_value;
-}
-
-int init_bit_modulator(int bit_rate, int decimation_rate) {
-	starting_bit_modulator = true;
-	current_bit = 0;
-	samples_sent_for_current_bit = 0;
-	// TODO HIGH SPEED
-////////////	samples_per_bit = g_sample_rate / bit_rate;
-	samples_per_bit = g_sample_rate / decimation_rate / bit_rate;
-	return EXIT_SUCCESS;
-}
-
-jack_default_audio_sample_t * telem_only_audio_loop(jack_default_audio_sample_t *in,
-		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
-
-
-	for (int i = 0; i< nframes; i++) {
-		if (send_telem) {
-			float bit_audio_value = modulate_bit();
-			out[i] = bit_audio_value; // add the telemetry
-		} else {
-			out[i] = 0.0;
-		}
-	}
-	return out;
-}
-
-jack_default_audio_sample_t * high_speed_telem_audio_loop(jack_default_audio_sample_t *in,
-		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
-
-
-	if (send_telem) {
-		for (int i = 0; i< nframes; i++) {
-			float bit_audio_value = modulate_bit();
-			out[i] = bit_audio_value; // add the telemetry
-			if (!clipping_reported)
-				if (out[i] > 1.0) {
-					error_print("Audio is clipping! %f",out[i]);
-					clipping_reported = 1;
-				}
-		}
-	}
-
-	return out;
-}
-
-/**
- * Prototype audio loop
- * This has too many loops within the loops and will be optimized
- * Currently this uses FIR decimation filters which will be replaced with a more efficient alternative
- *
- */
-jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
-		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
-
-	//	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
-
-	for (int i = 0; i< nframes; i++) {
-		filtered_audio_buffer[i] = fir_filter((double)in[i], decimate_filter_coeffs, decimate_filter_xv, DECIMATE_FILTER_LEN);
-	}
-
-	int decimate_count = 0;
-
-	for (int i = 0; i< nframes; i++) {
-		decimate_count++;
-		if (decimate_count == DECIMATION_RATE) {
-			decimate_count = 0;
-			decimated_audio_buffer[i/DECIMATION_RATE] = filtered_audio_buffer[i];
-		}
-	}
-
-	/**
-	 * Now we high pass filter
-	 */
-	if (hpf) {
-	//	iir_filter_array(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
-		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
-			hpf_decimated_audio_buffer[i] = iir_filter(Elliptic8Pole300HzHighPassIIRCoeff,decimated_audio_buffer[i], &iir_hpf_store);
-	//		hpf_decimated_audio_buffer[i] = cheby_iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
-	} else {
-		for (int i = 0; i< nframes/DECIMATION_RATE; i++)
-			hpf_decimated_audio_buffer[i] = decimated_audio_buffer[i];
-	}
-
-	/**
-	 * Insert DUV telemetry.
-	 */
-	if (send_telem) {
-		for (int i = 0; i< nframes/DECIMATION_RATE; i++) {
-			float bit_audio_value = modulate_bit();
-			hpf_decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
-		}
-	}
-
-	/**
-	 * We interpolate by adding samples with zero between each decimated sample.  This creates the same signal
-	 * at 48k with duplications of the spectrum every 9600Hz.  So we need to filter out those duplicates
-	 * from the final signal.  We apply gain equal to DECIMATION_RATE to compensate for the loss of signal
-	 * from the inserted samples.
-	 */
-	float gain = (float)DECIMATION_RATE;
-	for (int i = 0; i < nframes; i++) {
-		decimate_count++;
-		if (decimate_count == DECIMATION_RATE) {
-			decimate_count = 0;
-			interpolated_audio_buffer[i] = gain * hpf_decimated_audio_buffer[i/DECIMATION_RATE];
-		} else
-			interpolated_audio_buffer[i] = 0.0f;
-
-	}
-	/* Now filter out the duplications of the spectrum that interpolation introduces */
-	for (int i = 0; i< nframes; i++) {
-		out[i] = (float)fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
-		if (!clipping_reported)
-			if (out[i] > 1.0) {
-				error_print("Audio is clipping! %f",out[i]);
-				clipping_reported = 1;
-			}
-	}
-
-	return out;
-}
-
-jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes) {
-	/* Time the loop. Use clock_gettime because gettimeofday() is moved by NTP or other time sync mechanisms */
-	clock_gettime(CLOCK_MONOTONIC, &ts_start);
-
-	if (send_test_tone) {
-		for (int i=0; i < nframes; i++) {
-			double value = nextSample(&osc_phase, test_tone_freq, g_sample_rate, osc_sin_table, OSC_TABLE_SIZE);
-			//out[i] = 0.2 * value;
-			if (value > 0) out[i] = 0.2;
-			else out[i] = -0.2;
-		}
-	} else if (measure_test_tone) {
-		for (int i=0; i < nframes; i++) {
-			//out[i] = 0; // silence the output, except this does not work if we were already receiving a tone?
-			out[i] = in[i];  // play what we are measuring
-			//printf("%f\n", in[i]);
-
-			if (in[i] > peak_value)  //////////// This compare does not WORK!!
-				peak_value = in[i];
-
-			measurements++;
-
-		}
-		measurement_loops++;
-		if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
-			printf("Peak over %d measurements: %f\n", measurements, peak_value);
-			measurement_loops = 0;
-			measurements = 0;
-			peak_value = 0;
-		}
-	} else if (send_high_speed_telem) {
-		high_speed_telem_audio_loop(in, out, nframes);
-		clipping_reported = 0;
-	} else {
-		/*
-		 * Now process the data in out buffer before we sent it to the radio
-		 */
-		//telem_only_audio_loop(in, out, nframes);
-		duv_audio_loop(in, out, nframes);
-		clipping_reported = 0;
-	}
-
-	clock_gettime(CLOCK_MONOTONIC, &ts_end);
-	/* store the CPU time in microseconds */
-	loop_time_microsec = ((ts_end.tv_sec * 1000000 + ts_end.tv_nsec/1000) -
-			(ts_start.tv_sec * 1000000 + ts_start.tv_nsec/1000));
-
-	if (loop_time_microsec > max_loop_time_microsec)
-		max_loop_time_microsec = loop_time_microsec;
-	if (loop_time_microsec < min_loop_time_microsec)
-		min_loop_time_microsec = loop_time_microsec;
-	loops_timed++;
-	total_loop_time_microsec += loop_time_microsec;
-	if (loops_timed > LOOPS_TO_TIME) {
-		//verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
-		if (max_loop_time_microsec > 10000) // // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
-			error_print("WARNING: Loop ran for: %.2f ms\n",max_loop_time_microsec/1000);
-		verbose_print("Loop time: Max %.2fms Min: %.2fms\n",max_loop_time_microsec/1000,min_loop_time_microsec/1000);
-		total_loop_time_microsec = 0;
-		max_loop_time_microsec = 0;
-		min_loop_time_microsec = 99999;
-		loops_timed = 0;
-	}
-
-	return out;
-}
-
 /*
  * This initializes the audio processor and should be called when it is first started
  */
-int init_audio_processor(int bit_rate, int decimation_rate) {
+int init_audio_processor(int bit_rate, int dec_rate) {
 	// Init
-	/* Encode first packet */
 	int rc;
+	decimation_rate = dec_rate;
+
 	rc = init_bit_modulator(bit_rate, decimation_rate);
 	if (rc != 0) {
 		error_print("Error initializing bit modulator\n");
@@ -477,6 +255,229 @@ int init_filters(int bit_rate, int decimation_rate) {
 
 	return rc;
 }
+/*
+ * Turn the bit stream into samples that can be fed into the audio loop
+ */
+double modulate_bit() {
+	if (starting_bit_modulator ||  // starting a new packet
+			(samples_sent_for_current_bit >= samples_per_bit )) { // We are starting a new bit
+		samples_sent_for_current_bit = 0;
+		starting_bit_modulator = false;
+		if (send_test_telem) {
+			test_bits_sent++;
+			if (test_bits_sent == TEST_BIT_NUMBER) {
+				current_bit = !current_bit; // TESTING - just toggle the bit to generate tone
+				test_bits_sent = 0;
+			}
+		} else
+			current_bit = get_next_bit();
+
+		if (current_bit) {
+			one_bits_in_a_row++;
+			zero_bits_in_a_row = 0;
+		} else {
+			one_bits_in_a_row = 0;
+			zero_bits_in_a_row++;
+		}
+	}
+	samples_sent_for_current_bit++;
+	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
+	if (!send_high_speed_telem && g_ramp_bits_to_compensate_hpf) {
+		if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * RAMP_AMT;
+		if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * RAMP_AMT;
+	}
+
+	if (lpf_bits)
+		bit_audio_value = fir_filter(bit_audio_value, bit_filter_coeffs, bit_filter_xv, BIT_FILTER_LEN);
+
+	return bit_audio_value;
+}
+
+int init_bit_modulator(int bit_rate, int decimation_rate) {
+	starting_bit_modulator = true;
+	current_bit = 0;
+	samples_sent_for_current_bit = 0;
+	samples_per_bit = g_sample_rate / decimation_rate / bit_rate;
+	return EXIT_SUCCESS;
+}
+
+jack_default_audio_sample_t * telem_only_audio_loop(jack_default_audio_sample_t *in,
+		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
+
+
+	for (int i = 0; i< nframes; i++) {
+		if (send_telem) {
+			float bit_audio_value = modulate_bit();
+			out[i] = bit_audio_value; // add the telemetry
+		} else {
+			out[i] = 0.0;
+		}
+	}
+	return out;
+}
+
+jack_default_audio_sample_t * high_speed_telem_audio_loop(jack_default_audio_sample_t *in,
+		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
+
+
+	if (send_telem) {
+		for (int i = 0; i< nframes; i++) {
+			float bit_audio_value = modulate_bit();
+			out[i] = bit_audio_value; // add the telemetry
+			if (!clipping_reported)
+				if (out[i] > 1.0) {
+					error_print("Audio is clipping! %f",out[i]);
+					clipping_reported = 1;
+				}
+		}
+	}
+
+	return out;
+}
+
+/**
+ * Prototype audio loop
+ * This has too many loops within the loops and will be optimized
+ * Currently this uses FIR decimation filters which will be replaced with a more efficient alternative
+ *
+ */
+jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
+		jack_default_audio_sample_t *out, jack_nframes_t nframes) {
+
+	//	memcpy (out, in, sizeof (jack_default_audio_sample_t) * nframes);
+
+	for (int i = 0; i< nframes; i++) {
+		filtered_audio_buffer[i] = fir_filter((double)in[i], decimate_filter_coeffs, decimate_filter_xv, DECIMATE_FILTER_LEN);
+	}
+
+	int decimate_count = 0;
+
+	for (int i = 0; i< nframes; i++) {
+		decimate_count++;
+		if (decimate_count == decimation_rate) {
+			decimate_count = 0;
+			decimated_audio_buffer[i/decimation_rate] = filtered_audio_buffer[i];
+		}
+	}
+
+	/**
+	 * Now we high pass filter
+	 */
+	if (hpf) {
+	//	iir_filter_array(Elliptic8Pole300HzHighPassIIRCoeff, decimated_audio_buffer, hpf_decimated_audio_buffer, nframes/DECIMATION_RATE);
+		for (int i = 0; i< nframes/decimation_rate; i++)
+			hpf_decimated_audio_buffer[i] = iir_filter(Elliptic8Pole300HzHighPassIIRCoeff,decimated_audio_buffer[i], &iir_hpf_store);
+	//		hpf_decimated_audio_buffer[i] = cheby_iir_filter(decimated_audio_buffer[i], a_hpf_025, b_hpf_025);
+	} else {
+		for (int i = 0; i< nframes/decimation_rate; i++)
+			hpf_decimated_audio_buffer[i] = decimated_audio_buffer[i];
+	}
+
+	/**
+	 * Insert DUV telemetry.
+	 */
+	if (send_telem) {
+		for (int i = 0; i< nframes/decimation_rate; i++) {
+			float bit_audio_value = modulate_bit();
+			hpf_decimated_audio_buffer[i] += bit_audio_value; // add the telemetry
+		}
+	}
+
+	/**
+	 * We interpolate by adding samples with zero between each decimated sample.  This creates the same signal
+	 * at 48k with duplications of the spectrum every 9600Hz.  So we need to filter out those duplicates
+	 * from the final signal.  We apply gain equal to DECIMATION_RATE to compensate for the loss of signal
+	 * from the inserted samples.
+	 */
+	float gain = (float)decimation_rate;
+	for (int i = 0; i < nframes; i++) {
+		decimate_count++;
+		if (decimate_count == decimation_rate) {
+			decimate_count = 0;
+			interpolated_audio_buffer[i] = gain * hpf_decimated_audio_buffer[i/decimation_rate];
+		} else
+			interpolated_audio_buffer[i] = 0.0f;
+
+	}
+	/* Now filter out the duplications of the spectrum that interpolation introduces */
+	for (int i = 0; i< nframes; i++) {
+		out[i] = (float)fir_filter(interpolated_audio_buffer[i], interpolate_filter_coeffs, interpolate_filter_xv, DECIMATE_FILTER_LEN);
+		if (!clipping_reported)
+			if (out[i] > 1.0) {
+				error_print("Audio is clipping! %f",out[i]);
+				clipping_reported = 1;
+			}
+	}
+
+	return out;
+}
+
+jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_default_audio_sample_t *out, jack_nframes_t nframes) {
+	/* Time the loop. Use clock_gettime because gettimeofday() is moved by NTP or other time sync mechanisms */
+	clock_gettime(CLOCK_MONOTONIC, &ts_start);
+
+	if (send_test_tone) {
+		for (int i=0; i < nframes; i++) {
+			double value = nextSample(&osc_phase, test_tone_freq, g_sample_rate, osc_sin_table, OSC_TABLE_SIZE);
+			//out[i] = 0.2 * value;
+			if (value > 0) out[i] = 0.2;
+			else out[i] = -0.2;
+		}
+	} else if (measure_test_tone) {
+		for (int i=0; i < nframes; i++) {
+			//out[i] = 0; // silence the output, except this does not work if we were already receiving a tone?
+			out[i] = in[i];  // play what we are measuring
+			//printf("%f\n", in[i]);
+
+			if (in[i] > peak_value)  //////////// This compare does not WORK!!
+				peak_value = in[i];
+
+			measurements++;
+
+		}
+		measurement_loops++;
+		if (measurement_loops >= LOOPS_PER_MEASUREMENT) {
+			printf("Peak over %d measurements: %f\n", measurements, peak_value);
+			measurement_loops = 0;
+			measurements = 0;
+			peak_value = 0;
+		}
+	} else if (send_high_speed_telem) {
+		high_speed_telem_audio_loop(in, out, nframes);
+		clipping_reported = 0;
+	} else {
+		/*
+		 * Now process the data in out buffer before we sent it to the radio
+		 */
+		//telem_only_audio_loop(in, out, nframes);
+		duv_audio_loop(in, out, nframes);
+		clipping_reported = 0;
+	}
+
+	clock_gettime(CLOCK_MONOTONIC, &ts_end);
+	/* store the CPU time in microseconds */
+	loop_time_microsec = ((ts_end.tv_sec * 1000000 + ts_end.tv_nsec/1000) -
+			(ts_start.tv_sec * 1000000 + ts_start.tv_nsec/1000));
+
+	if (loop_time_microsec > max_loop_time_microsec)
+		max_loop_time_microsec = loop_time_microsec;
+	if (loop_time_microsec < min_loop_time_microsec)
+		min_loop_time_microsec = loop_time_microsec;
+	loops_timed++;
+	total_loop_time_microsec += loop_time_microsec;
+	if (loops_timed > LOOPS_TO_TIME) {
+		//verbose_print("INFO: Audio loop processing time: %f secs\n",total_cpu_time_used/loops_timed);
+		if (max_loop_time_microsec > 10000) // // 480 frames is 10ms of audio.  So if we take more than 10ms to process this we have an issue
+			error_print("WARNING: Loop ran for: %.2f ms\n",max_loop_time_microsec/1000);
+		verbose_print("Loop time: Max %.2fms Min: %.2fms\n",max_loop_time_microsec/1000,min_loop_time_microsec/1000);
+		total_loop_time_microsec = 0;
+		max_loop_time_microsec = 0;
+		min_loop_time_microsec = 99999;
+		loops_timed = 0;
+	}
+
+	return out;
+}
 
 /******************************************************************************
  *
@@ -518,7 +519,7 @@ int test_modulate_bit() {
 //	current_bit = 0;
 
 	g_sample_rate = 48000;
-	init_audio_processor(DUV_BPS, DECIMATION_RATE);
+	init_audio_processor(DUV_BPS, DUV_DECIMATION_RATE);
 //	samples_per_duv_bit = g_sample_rate / DECIMATION_RATE / DUV_BPS;
 
 	unsigned char *test_packet = set_test_packet();

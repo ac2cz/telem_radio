@@ -46,7 +46,8 @@ int get_xruns_since_start() { return xruns; }
  * decides to disconnect the client.
  */
 void jack_shutdown (void *arg) {
-	exit (1);
+	error_print("Jack Server called shutdown\n");
+	//exit (1);
 }
 
 /* count xruns */
@@ -190,10 +191,14 @@ int start_jack_audio_processor (void) {
 	free (ports);
 
 	/* keep running until stopped by the user, if we are in interactive mode.  Otherwise run until jack shutdown called. */
-	int rc = start_cmd_console();
+
+	return EXIT_SUCCESS;
+}
+
+int stop_jack_audio_processor (void) {
 
 	jack_client_close (client);
 	debug_print("Jack client closed down\n");
-	return rc;
+	return EXIT_SUCCESS;
 }
 

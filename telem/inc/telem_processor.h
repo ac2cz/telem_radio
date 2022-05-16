@@ -31,7 +31,7 @@
 #define DUV_DATA_LENGTH 64
 #define DUV_PARITIES_LENGTH 32
 
-#define FSK_1200_BPS 200
+#define FSK_1200_BPS 1200
 #define FSK_1200_PACKET_LENGTH 96  /* 4 header bytes, 60 payload bytes, 32 check bytes */
 #define FSK_1200_DATA_LENGTH 64
 #define FSK_1200_PARITIES_LENGTH 32

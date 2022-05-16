@@ -55,8 +55,8 @@ void print_full_status() {
 	printf("TELEM Radio status:\n");
 	printf(" audio engine sample rate: %" PRIu32 "\n", g_sample_rate);
 	printf(" samples per bit: %d\n", get_samples_per_bit());
-	int rate = g_sample_rate/DECIMATION_RATE;
-	printf(" decimation factor: %d with audio loop sample rate %d\n",DECIMATION_RATE, rate);
+	int rate = g_sample_rate/get_decimation_rate();
+	printf(" decimation factor: %d with audio loop sample rate %d\n",get_decimation_rate(), rate);
 	printf(" test tone freq %d Hz\n",(int)get_test_tone_freq());
 	print_status("High Pass Filter", get_hpf());
 	print_status("Bit Low Pass Filter", get_lpf_bits());
@@ -104,8 +104,9 @@ int start_cmd_console() {
 				print_status("Bit Low Pass Filter", get_lpf_bits());
 			} else if (strcmp(token, "telem") == 0 || strcmp(token, "t") == 0) {
 				set_send_telem(!get_send_telem());
+				set_send_high_speed_telem(false);
 				if (get_send_telem() == true) { // reset the modulator
-					rc = init_bit_modulator(DUV_BPS, 4);
+					rc = init_bit_modulator(DUV_BPS, DUV_DECIMATION_RATE);
 					if (rc != EXIT_SUCCESS) {
 						error_print("Issue initializing the modulator.  It may not work correctly..");
 					}
@@ -115,7 +116,7 @@ int start_cmd_console() {
 				set_send_high_speed_telem(!get_send_high_speed_telem());
 				set_send_telem(get_send_high_speed_telem());
 				if (get_send_high_speed_telem() == true) { // reset the modulator
-					rc = init_bit_modulator(FSK_1200_BPS*DECIMATION_RATE, 1);
+					rc = init_bit_modulator(FSK_1200_BPS, 1);
 					if (rc != EXIT_SUCCESS) {
 						error_print("Issue initializing the high speed bit modulator.  It may not work correctly..");
 					}

@@ -1,0 +1,22 @@
+TELEM RADIO
+===========
+
+Startup flow:
+
+main():
+  parse command line params
+  run self tests if requested
+
+  init_telem_processor():
+    set the packet length - but note that the buffers are hard coded
+    first packet flag is true
+    reset all the params to zero for get_next_bit() and encode_next_packet()
+
+  create telem_thread_process():
+    
+
+  init_audio_processor():
+
+  start_jack_audio_processor():
+
+

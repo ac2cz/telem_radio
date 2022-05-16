@@ -43,7 +43,7 @@ void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet);
 /* Telemetry modulator variables */
 unsigned char parities[DUV_PARITIES_LENGTH];   /* This is the parities calculated by the RS encoder */
 uint16_t encoded_packet[2][DUV_PACKET_LENGTH+1]; /* This is the 10b encoded packet with parities. It includes space for SYNC WORD at the end. */
-int current_encoded_packet_num = 0; /* We have two encoded packets.  One is being sent and the other is being built. */
+int current_encoded_packet_num; /* We have two encoded packets.  One is being sent and the other is being built. */
 
 /* This test packet is a 101010 sequence of 10b words */
 uint16_t encoded_packet_test1[] = {
@@ -61,11 +61,21 @@ uint16_t encoded_packet_test1[] = {
 		0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0x2aa,0xfa
 };
 
-int packet_length = 0; // initialized at startup to equal the length of a packet.
-int first_packet_to_be_sent = true; // flag that tells us if a sync word is needed at the start of the packet
-int bits_sent_for_current_word = 0; // how many bits have we sent for the current 10b word
+int packet_length; // initialized at startup to equal the length of a packet.
+int first_packet_to_be_sent; // flag that tells us if a sync word is needed at the start of the packet
+int bits_sent_for_current_word; // how many bits have we sent for the current 10b word
 int words_sent_for_current_packet; // how many 10b words we have sent for the current packet
 int rd_state = 0; // 8b10b Encoder state, initialized once at startup
+
+int init_telemetry_processor(int packet_len) {
+	packet_length = packet_len;
+	first_packet_to_be_sent = true;
+	bits_sent_for_current_word = 0;
+	words_sent_for_current_packet = 0;
+	current_encoded_packet_num = 0;
+	init_rd_state();
+	return 0;
+}
 
 void init_rd_state() {
 	rd_state = 0;
@@ -161,16 +171,6 @@ void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet) {
 	for(int i=0;i< DUV_PARITIES_LENGTH;i++)
 		encoded_packet[j++] = encode_8b10b(&rd_state,parities[i]);
 	encoded_packet[j] = encode_8b10b(&rd_state,-1); // Insert end-of-frame flag
-}
-
-int init_telemetry_processor(int packet_len) {
-	packet_length = packet_len;
-	first_packet_to_be_sent = true;
-	bits_sent_for_current_word = 0;
-	words_sent_for_current_packet = 0;
-	current_encoded_packet_num = 0;
-	init_rd_state();
-	return 0;
 }
 
 /*
