@@ -57,12 +57,6 @@ int jack_xrun_callback(void *arg)  {
 	return 0;
 }
 
-void stop_jack() {
-	stop_cmd_console();
-	jack_client_close (client);
-	debug_print("Jack client disconnected\n");
-}
-
 /**
  * The process callback for this JACK application is called in a
  * special realtime thread once for each audio cycle.

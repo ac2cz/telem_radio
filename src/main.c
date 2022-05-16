@@ -48,6 +48,7 @@
 #include "audio_processor.h"
 #include "telem_thread.h"
 #include "gpio_interface.h"
+#include "cmd_console.h"
 
 /* Included for self tests */
 #include "iir_filter.h"
@@ -142,7 +143,8 @@ void signal_handler (int sig) {
 	debug_print (" Signal received, exiting ...\n");
 
 	telem_thread_stop();
-	stop_jack();
+	stop_cmd_console();
+	stop_jack_audio_processor();
 	sleep(1); // give jack time to close
 	cleanup_telem_processor();
 	exit (0);
@@ -257,9 +259,9 @@ int main(int argc, char *argv[]) {
     		error_print("FATAL. Could not start the jack audio thread.\n");
     		exit(rc);
     	}
-    rc = start_cmd_console();
+    rc = start_cmd_console();  // this will run until the user exits (or until we receive a signal)
     if (rc != EXIT_SUCCESS) {
-    	error_print("FATAL. Could not start the command console.\n");
+    	error_print("FATAL. Error with the command console.\n");
     	exit(rc);
     }
     telem_thread_stop();
