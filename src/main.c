@@ -60,9 +60,15 @@
 
 /*
  *  GLOBAL VARIABLES defined here.  They are declared in config.h
+ *  These are the default values.  Many can be updated with a value
+ *  in telem_radio.config or can be over riden on the command line.
+ *
  */
 int g_verbose = false;
 int g_sample_rate = 48000;
+double g_one_value = 0.2;
+double g_zero_value = -0.2;
+double g_ramp_amount = 0.02;
 int g_ramp_bits_to_compensate_hpf = true;
 
 /* local variables for this file */
@@ -156,6 +162,9 @@ int main(int argc, char *argv[]) {
 	signal (SIGTERM, signal_handler);
 	signal (SIGHUP, signal_handler);
 	signal (SIGINT, signal_handler);
+
+	/* Load configuration from the config file */
+	load_config();
 
 	struct option long_option[] =
 	{

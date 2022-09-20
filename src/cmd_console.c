@@ -53,10 +53,12 @@ void print_status(char *name, int status) {
  */
 void print_full_status() {
 	printf("TELEM Radio status:\n");
-	printf(" audio engine sample rate: %" PRIu32 "\n", g_sample_rate);
-	printf(" samples per bit: %d\n", get_samples_per_bit());
 	int rate = g_sample_rate/get_decimation_rate();
-	printf(" decimation factor: %d with audio loop sample rate %d\n",get_decimation_rate(), rate);
+	printf(" audio engine sample rate: %" PRIu32 " with decimation by %d to %d\n", g_sample_rate,get_decimation_rate(), rate);
+	printf(" samples per bit: %d. Ramp to compensate HPF: %d", get_samples_per_bit(), g_ramp_bits_to_compensate_hpf);
+	if (g_ramp_bits_to_compensate_hpf)
+		printf(" amount %.2f", g_ramp_amount);
+	printf("\n");
 	printf(" test tone freq %d Hz\n",(int)get_test_tone_freq());
 	print_status("High Pass Filter", get_hpf());
 	print_status("Bit Low Pass Filter", get_lpf_bits());

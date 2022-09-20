@@ -30,16 +30,6 @@
 /* The reduction from 48000 samples per sec for the audio loop */
 #define DUV_DECIMATION_RATE 4
 
-/*
- * These values specify the strength of the telemetry.  They should be carefully calculated and set.
- * This should probably be in a configuration file.
- */
-#define ONE_VALUE 0.20
-#define ZERO_VALUE -0.20
-
-/* When bits have the same value ramp the amount up to compensate for HPF in the radio transmitter */
-#define RAMP_AMT 0.1 * ONE_VALUE
-
 /* Access to variables needed by other files */
 int get_decimation_rate();
 double get_loop_time_microsec();

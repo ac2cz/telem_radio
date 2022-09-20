@@ -281,10 +281,10 @@ double modulate_bit() {
 		}
 	}
 	samples_sent_for_current_bit++;
-	double bit_audio_value = current_bit ? ONE_VALUE : ZERO_VALUE;
+	double bit_audio_value = current_bit ? g_one_value : g_zero_value;
 	if (!send_high_speed_telem && g_ramp_bits_to_compensate_hpf) {
-		if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * RAMP_AMT;
-		if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * RAMP_AMT;
+		if (one_bits_in_a_row) bit_audio_value = bit_audio_value + (one_bits_in_a_row-1) * g_ramp_amount;
+		if (zero_bits_in_a_row) bit_audio_value = bit_audio_value - (zero_bits_in_a_row-1) * g_ramp_amount;
 	}
 
 	if (lpf_bits)
@@ -337,8 +337,8 @@ jack_default_audio_sample_t * high_speed_telem_audio_loop(jack_default_audio_sam
 
 /**
  * Prototype audio loop
- * This has too many loops within the loops and will be optimized
- * Currently this uses FIR decimation filters which will be replaced with a more efficient alternative
+ * This has too many loops within the loops, which helps with debugging, but could be optimized
+ * Currently this uses FIR decimation filters which could be replaced with a more efficient alternative
  *
  */
 jack_default_audio_sample_t * duv_audio_loop(jack_default_audio_sample_t *in,
@@ -419,9 +419,8 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 	if (send_test_tone) {
 		for (int i=0; i < nframes; i++) {
 			double value = nextSample(&osc_phase, test_tone_freq, g_sample_rate, osc_sin_table, OSC_TABLE_SIZE);
-			//out[i] = 0.2 * value;
-			if (value > 0) out[i] = 0.2;
-			else out[i] = -0.2;
+			if (value > 0) out[i] = g_one_value;
+			else out[i] = g_zero_value;
 		}
 	} else if (measure_test_tone) {
 		for (int i=0; i < nframes; i++) {
@@ -429,7 +428,7 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 			out[i] = in[i];  // play what we are measuring
 			//printf("%f\n", in[i]);
 
-			if (in[i] > peak_value)  //////////// This compare does not WORK!!
+			if (in[i] > peak_value)
 				peak_value = in[i];
 
 			measurements++;
@@ -536,7 +535,7 @@ int test_modulate_bit() {
 		if ((i) % samples_per_bit == 0) {
 			// first sample of bit
 			verbose_print ("%.3f ",bit_audio_value);
-			double test_value = expected_result1[j] ? ONE_VALUE : ZERO_VALUE;
+			double test_value = expected_result1[j] ? g_one_value : g_zero_value;
 			if (test_value != bit_audio_value) {
 				verbose_print (" **start err ");
 				fail = 1;
@@ -545,7 +544,7 @@ int test_modulate_bit() {
 		if ((i+1) % samples_per_bit == 0) {
 			// last sample of bit
 			//printf ("%.3f ",i, bit_audio_value);
-			double test_value = expected_result1[j++] ? ONE_VALUE : ZERO_VALUE;
+			double test_value = expected_result1[j++] ? g_one_value : g_zero_value;
 			if (test_value != bit_audio_value) {
 				verbose_print (" **end err, got '%.3f' ",bit_audio_value);
 				fail = 1;
@@ -573,7 +572,7 @@ int test_modulate_bit() {
 			if ((i) % samples_per_bit == 0) {
 				verbose_print ("%.3f ",bit_audio_value);
 				if (check_expected_results) {
-					double test_value = expected_result2[j++] ? ONE_VALUE : ZERO_VALUE;
+					double test_value = expected_result2[j++] ? g_one_value : g_zero_value;
 					if (test_value != bit_audio_value) {
 						verbose_print (" **start err ");
 						fail = 1;
