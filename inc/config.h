@@ -25,6 +25,7 @@
 
 #define VERSION __DATE__ " - Version 0.4"
 #define DEBUG 1
+//#define PTT_WITH_GPIO
 #define true 1
 #define false 0
 #define EPOCH_START_YEAR 2000
@@ -49,6 +50,8 @@ extern double g_zero_value;
 extern double g_ramp_amount; /* When bits have the same value ramp the amount up to compensate for HPF in the radio transmitter */
 extern int g_ramp_bits_to_compensate_hpf; /* Apply a slight ramp to the bits to compensate for high pass filter in the radio */
 
+extern int g_ptt_state; /* PTT state for RTS or GPIO control */
+extern int g_serial_fd; /* the file descriptor for the serial port */
 
 void load_config();
 

@@ -49,6 +49,7 @@
 #include "telem_thread.h"
 #include "gpio_interface.h"
 #include "cmd_console.h"
+#include "serial.h"
 
 /* Included for self tests */
 #include "iir_filter.h"
@@ -70,6 +71,8 @@ double g_one_value = 0.2;
 double g_zero_value = -0.2;
 double g_ramp_amount = 0.02;
 int g_ramp_bits_to_compensate_hpf = true;
+int g_ptt_state = 0;
+int g_serial_fd = -1;
 
 /* local variables for this file */
 pthread_t telem_pthread;
@@ -95,7 +98,7 @@ int run_self_test() {
 
 
 	if (fail == EXIT_SUCCESS)
-		printf("All Tests Passed\n\n");
+		printf("All Tests have Passed\n\n");
 	else
 		printf("Some Tests Failed\n\n");
 
@@ -147,12 +150,13 @@ void help(void) {
 
 void signal_handler (int sig) {
 	debug_print (" Signal received, exiting ...\n");
-
+	closeserial(g_serial_fd);
 	telem_thread_stop();
 	stop_cmd_console();
 	stop_jack_audio_processor();
 	sleep(1); // give jack time to close
 	cleanup_telem_processor();
+
 	exit (0);
 }
 
@@ -221,14 +225,26 @@ int main(int argc, char *argv[]) {
 #ifdef RASPBERRY_PI
 	if (!filter_test_num)
 		debug_print("Running on a Raspberry PI\n");
-
+#ifdef PTT_WITH_GPIO
 	gpio_init();
+#endif
 
 #endif
 
 #ifdef LINUX
 	if (!filter_test_num)
 		debug_print("Running on Linux\n");
+#endif
+
+#ifndef PTT_WITH_GPIO
+	char *serialdev = "/dev/ttyUSB0";
+
+	g_serial_fd = openserial(serialdev);
+	if (!g_serial_fd) {
+		fprintf(stderr, "Error while initializing %s.\n", serialdev);
+		return 1;
+	}
+	setRTS(g_serial_fd, g_ptt_state);
 #endif
 
 
@@ -273,6 +289,8 @@ int main(int argc, char *argv[]) {
     	error_print("FATAL. Error with the command console.\n");
     	exit(rc);
     }
+
+    closeserial(g_serial_fd);
     telem_thread_stop();
     cleanup_telem_processor();
 

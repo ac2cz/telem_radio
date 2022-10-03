@@ -31,9 +31,6 @@
 #include "config.h"
 #include "debug.h"
 
-/* initialize the PTT state to low with the radio off */
-int ptt_state = LOW;
-
 
 
 /**
@@ -65,12 +62,8 @@ int gpio_init() {
     return rc;
 }
 
-int gpio_get_ptt() { return ptt_state; }
-
 int gpio_set_ptt(int state) {
 	int rc = EXIT_SUCCESS;
-
-	ptt_state = state;
 
 
 	#ifdef RASPBERRY_PI

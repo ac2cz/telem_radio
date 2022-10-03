@@ -59,7 +59,6 @@ For further information, please refer to https://pinout.xyz/
 #endif /* NOT RASPBERRY_PI */
 
 int gpio_init();
-int gpio_get_ptt();
 int gpio_set_ptt(int state);
 
 #endif /* GPIO_INTERFACE_H_ */

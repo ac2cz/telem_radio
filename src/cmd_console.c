@@ -17,6 +17,7 @@
 #include "oscillator.h"
 #include "gpio_interface.h"
 #include "duv_telem_layout.h"
+#include "serial.h"
 
 /* Forward function declarations */
 void print_status(char *name, int status);
@@ -65,7 +66,7 @@ void print_full_status() {
 	print_status("DUV Telemetry", get_send_telem());
 	print_status("High Speed Telemetry", get_send_high_speed_telem());
 	print_status("Test Telem", get_send_test_telem());
-	print_status("Transmitter", gpio_get_ptt());
+	print_status("Transmitter", g_ptt_state);
 
 	print_status("Generate test tone", get_send_test_tone());
 	print_status("Measure input test tone", get_measure_test_tone());
@@ -125,8 +126,13 @@ int start_cmd_console() {
 				}
 				print_status("Telemetry", get_send_telem());
 			} else if (strcmp(token, "ptt") == 0 || strcmp(token, "p") == 0) {
-				gpio_set_ptt(!gpio_get_ptt());
-				print_status("Transmitter", gpio_get_ptt());
+				g_ptt_state = !g_ptt_state;
+#ifdef PTT_WITH_GPIO
+				gpio_set_ptt(g_ptt_state);
+#else
+				setRTS(g_serial_fd, g_ptt_state);
+#endif
+				print_status("Transmitter", g_ptt_state);
 			} else if (strcmp(token, "test") == 0) {
 				set_send_test_telem(!get_send_test_telem());
 				print_status("Test Telem", get_send_test_telem());
@@ -161,9 +167,14 @@ int start_cmd_console() {
 	}
 	free(line);
 	printf("Stopping audio processor ..\n");
+#ifndef RASPBERRY_PI
 	/* Make sure the transmitter is off as we exit */
+#ifdef PTT_WITH_GPIO
 	gpio_set_ptt(LOW);
-	print_status("Transmitter", gpio_get_ptt());
-
+#else
+	setRTS(g_serial_fd,LOW);
+#endif
+	print_status("Transmitter", g_ptt_state);
+#endif
 	return 0;
 }
