@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "Error while initializing %s.\n", serialdev);
 		return 1;
 	}
-	setRTS(g_serial_fd, g_ptt_state);
+	set_rts(g_serial_fd, g_ptt_state);
 #endif
 
 

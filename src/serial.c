@@ -18,14 +18,10 @@
 
 static struct termios oldterminfo;
 
-
-void closeserial(int fd)
-{
-    tcsetattr(fd, TCSANOW, &oldterminfo);
+void closeserial(int fd) {
     if (close(fd) < 0)
         perror("closeserial()");
 }
-
 
 int openserial(char *devicename)
 {
@@ -36,40 +32,28 @@ int openserial(char *devicename)
         perror("openserial(): open()");
         return 0;
     }
-    if (tcgetattr(fd, &oldterminfo) == -1) {
-        perror("openserial(): tcgetattr()");
-        return 0;
-    }
-    attr = oldterminfo;
-    attr.c_cflag |= CRTSCTS | CLOCAL;
-    attr.c_oflag = 0;
-    if (tcflush(fd, TCIOFLUSH) == -1) {
-        perror("openserial(): tcflush()");
-        return 0;
-    }
-    if (tcsetattr(fd, TCSANOW, &attr) == -1) {
-        perror("initserial(): tcsetattr()");
-        return 0;
-    }
+
     return fd;
 }
 
-
-int setRTS(int fd, int level)
-{
-    int status;
-
-    if (ioctl(fd, TIOCMGET, &status) == -1) {
-        perror("setRTS(): TIOCMGET");
-        return 0;
-    }
-    if (level)
-        status |= TIOCM_RTS;
-    else
-        status &= ~TIOCM_RTS;
-    if (ioctl(fd, TIOCMSET, &status) == -1) {
-        perror("setRTS(): TIOCMSET");
-        return 0;
-    }
-    return 1;
+void set_rts(int fd, int state) {
+	if (state)
+		rts_on(fd);
+	else
+		rts_off(fd);
 }
+
+void rts_on(int fd) {
+	int attr;
+	ioctl (fd, TIOCMGET, &attr);
+	attr |= TIOCM_RTS;
+	ioctl (fd, TIOCMSET, &attr);
+}
+
+void rts_off(int fd) {
+	int attr;
+	ioctl (fd, TIOCMGET, &attr);
+	attr &= ~TIOCM_RTS;
+	ioctl (fd, TIOCMSET, &attr);
+}
+

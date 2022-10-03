@@ -10,6 +10,6 @@
 
 void closeserial(int fd);
 int openserial(char *devicename);
-int setRTS(int fd, int level);
+int set_rts(int fd, int level);
 
 #endif /* SERIAL_H_ */

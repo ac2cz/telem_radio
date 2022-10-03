@@ -130,7 +130,7 @@ int start_cmd_console() {
 #ifdef PTT_WITH_GPIO
 				gpio_set_ptt(g_ptt_state);
 #else
-				setRTS(g_serial_fd, g_ptt_state);
+				set_rts(g_serial_fd, g_ptt_state);
 #endif
 				print_status("Transmitter", g_ptt_state);
 			} else if (strcmp(token, "test") == 0) {
@@ -172,7 +172,7 @@ int start_cmd_console() {
 #ifdef PTT_WITH_GPIO
 	gpio_set_ptt(LOW);
 #else
-	setRTS(g_serial_fd,LOW);
+	set_rts(g_serial_fd,LOW);
 #endif
 	print_status("Transmitter", g_ptt_state);
 #endif
