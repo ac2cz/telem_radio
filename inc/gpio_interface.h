@@ -48,6 +48,8 @@ For further information, please refer to https://pinout.xyz/
 #include <bcm2835.h>
 
 #define GPIO_PTT RPI_BPLUS_GPIO_J8_07 // GPIO4
+uint16_t clk_div = BCM2835_I2C_CLOCK_DIVIDER_148;
+
 #endif /* RASPBERRY_PI */
 
 #ifndef RASPBERRY_PI

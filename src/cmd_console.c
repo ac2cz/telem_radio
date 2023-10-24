@@ -37,6 +37,7 @@ char *help_str =
 		" tone          - Generate test tone\n"
 		" freq <Hz>     - Set freq of test tone\n"
 		" measure       - Display measurement for input tone\n"
+		" (v)verbose    - Toggle verbose output for debugging"
 		" (h)help       - show this help\n"
 		" (q)uit        - Shutdown and exit\n\n";
 

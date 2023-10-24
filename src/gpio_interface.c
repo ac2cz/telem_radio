@@ -46,9 +46,16 @@ int gpio_init() {
         return 1;
     }
 
+    if (!bcm2835_i2c_begin()) {
+        printf("Could not initialize i2c, likely not running with sufficient privs\n");
+        bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_148);
+    }
+/*
     if (!bcm2835_spi_begin()) {
         printf("Could not initialize spi, likely not running as root\n");
     }
+*/
+
     /* Set Pin 7 on connector J8 as OUTPUT
       * This is GPIO 4 and we could have put 4 instead
       * Use the enumerations that start with RPI_BPLUS for all
