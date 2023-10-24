@@ -15,8 +15,11 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+/* Forward functions */
+void rts_on(int fd);
+void rts_off(int fd);
 
-static struct termios oldterminfo;
+//static struct termios oldterminfo;
 
 void closeserial(int fd) {
     if (close(fd) < 0)
@@ -26,7 +29,7 @@ void closeserial(int fd) {
 int openserial(char *devicename)
 {
     int fd;
-    struct termios attr;
+   // struct termios attr;
 
     if ((fd = open(devicename, O_RDWR)) == -1) {
         perror("openserial(): open()");
