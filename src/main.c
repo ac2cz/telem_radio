@@ -220,7 +220,7 @@ int main(int argc, char *argv[]) {
 	}
 	int rc = EXIT_SUCCESS;
 
-#ifdef DEBUG
+
 
 #ifdef RASPBERRY_PI
 	if (!filter_test_num)
@@ -242,12 +242,12 @@ int main(int argc, char *argv[]) {
 	g_serial_fd = openserial(serialdev);
 	if (!g_serial_fd) {
 		fprintf(stderr, "Error while initializing %s.\n", serialdev);
-		return 1;
+	//	return 1;
 	}
 	set_rts(g_serial_fd, g_ptt_state);
 #endif
 
-
+#ifdef DEBUG
 	if (filter_test_num) {
 		rc = run_filter_test(filter_test_num, print_filter_test_output);
 		exit(rc);

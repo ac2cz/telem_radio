@@ -23,7 +23,7 @@
 
 #include "debug.h"
 
-#define VERSION __DATE__ " - Version 0.4"
+#define VERSION __DATE__ " - Version 0.5"
 #define DEBUG 1
 //#define PTT_WITH_GPIO
 #define true 1
