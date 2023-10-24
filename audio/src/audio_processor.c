@@ -443,14 +443,12 @@ jack_default_audio_sample_t * audio_loop(jack_default_audio_sample_t *in, jack_d
 		}
 	} else if (send_high_speed_telem) {
 		high_speed_telem_audio_loop(in, out, nframes);
-		clipping_reported = 0;
 	} else {
 		/*
 		 * Now process the data in out buffer before we sent it to the radio
 		 */
 		//telem_only_audio_loop(in, out, nframes);
 		duv_audio_loop(in, out, nframes);
-		clipping_reported = 0;
 	}
 
 	clock_gettime(CLOCK_MONOTONIC, &ts_end);
