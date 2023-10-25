@@ -57,7 +57,8 @@
 int init_lp25hb() {
 	uint8_t buf[2];
 	buf[0] = 0x0F; // WHO AM I
-	i2c_write(LPS25HB_ADDRESS, buf, 2);
-	i2c_read(LPS25HB_ADDRESS, buf, 2);
+	int rc = i2c_write(LPS25HB_ADDRESS, buf, 2);
+	rc = i2c_read(LPS25HB_ADDRESS, buf, 2);
 
+	return rc;
 }

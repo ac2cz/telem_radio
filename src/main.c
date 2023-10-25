@@ -50,6 +50,8 @@
 #include "cmd_console.h"
 #include "serial.h"
 
+#include "device_lps25hb.h"
+
 /* Included for self tests */
 #include "iir_filter.h"
 #include "audio_tools.h"
@@ -226,6 +228,8 @@ int main(int argc, char *argv[]) {
 	if (!filter_test_num)
 		debug_print("Running on a Raspberry PI\n");
 	gpio_init();
+
+	init_lp25hb();
 
 #endif
 
