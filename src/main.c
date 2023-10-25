@@ -225,9 +225,7 @@ int main(int argc, char *argv[]) {
 #ifdef RASPBERRY_PI
 	if (!filter_test_num)
 		debug_print("Running on a Raspberry PI\n");
-#ifdef PTT_WITH_GPIO
 	gpio_init();
-#endif
 
 #endif
 

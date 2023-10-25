@@ -48,6 +48,8 @@ int gpio_init() {
 
     if (!bcm2835_i2c_begin()) {
         printf("Could not initialize i2c, likely not running with sufficient privs\n");
+    } else {
+        printf("Initialized i2c\n");
         bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_148);
     }
 /*
