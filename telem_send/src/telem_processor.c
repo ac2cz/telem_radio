@@ -23,6 +23,8 @@
  *
  */
 
+#include "../../telem_send/inc/telem_processor.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -33,9 +35,9 @@
 
 #include "debug.h"
 #include "config.h"
-#include "telem_processor.h"
-#include "TelemEncoding.h"
-#include "telem_thread.h"
+
+#include "../../telem_send/inc/telem_thread.h"
+#include "../../telem_send/inc/TelemEncoding.h"
 
 /* Forward function definitions */
 void encode_duv_telem_packet(unsigned char *packet, uint16_t *encoded_packet);

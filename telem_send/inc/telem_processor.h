@@ -23,7 +23,8 @@
 #define TELEM_PROCESSOR_H_
 
 #include <stdint.h>
-#include <duv_telem_layout.h>
+
+#include "../../telem_send/inc/duv_telem_layout.h"
 
 /* Store the values for the telemetry modulator */
 #define DUV_BPS 200

@@ -13,11 +13,11 @@
 #include "config.h"
 #include "debug.h"
 #include "audio_processor.h"
-#include "telem_processor.h"
 #include "oscillator.h"
 #include "gpio_interface.h"
-#include "duv_telem_layout.h"
 #include "serial.h"
+#include "../telem_send/inc/duv_telem_layout.h"
+#include "../telem_send/inc/telem_processor.h"
 
 /* Forward function declarations */
 void print_status(char *name, int status);

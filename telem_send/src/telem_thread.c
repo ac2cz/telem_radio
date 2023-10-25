@@ -39,8 +39,9 @@
 #include "config.h"
 #include "debug.h"
 #include "jack_audio.h"
-#include "telem_processor.h"
-#include "duv_telem_layout.h"
+
+#include "../../telem_send/inc/duv_telem_layout.h"
+#include "../../telem_send/inc/telem_processor.h"
 
 /* Forward function definitions */
 int gather_duv_telemetry(int type, duv_packet_t *packet);

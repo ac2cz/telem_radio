@@ -4,23 +4,23 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../audio/src/audio_processor.c \
-../audio/src/audio_tools.c \
-../audio/src/jack_audio.c 
+../telem_send/src/TelemEncoding.c \
+../telem_send/src/telem_processor.c \
+../telem_send/src/telem_thread.c 
 
 C_DEPS += \
-./audio/src/audio_processor.d \
-./audio/src/audio_tools.d \
-./audio/src/jack_audio.d 
+./telem_send/src/TelemEncoding.d \
+./telem_send/src/telem_processor.d \
+./telem_send/src/telem_thread.d 
 
 OBJS += \
-./audio/src/audio_processor.o \
-./audio/src/audio_tools.o \
-./audio/src/jack_audio.o 
+./telem_send/src/TelemEncoding.o \
+./telem_send/src/telem_processor.o \
+./telem_send/src/telem_thread.o 
 
 
 # Each subdirectory must supply rules for building sources it contributes
-audio/src/%.o: ../audio/src/%.c audio/src/subdir.mk
+telem_send/src/%.o: ../telem_send/src/%.c telem_send/src/subdir.mk
 	@echo 'Building file: $<'
 	@echo 'Invoking: GCC C Compiler'
 	gcc -DRASPBERRY_PI -I../inc -I../dsp/inc -I../audio/inc -I../telem_send/inc -I../telem_capture/inc -O3 -Wall -c -fmessage-length=0 -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" -o "$@" "$<"
@@ -28,10 +28,10 @@ audio/src/%.o: ../audio/src/%.c audio/src/subdir.mk
 	@echo ' '
 
 
-clean: clean-audio-2f-src
+clean: clean-telem_send-2f-src
 
-clean-audio-2f-src:
-	-$(RM) ./audio/src/audio_processor.d ./audio/src/audio_processor.o ./audio/src/audio_tools.d ./audio/src/audio_tools.o ./audio/src/jack_audio.d ./audio/src/jack_audio.o
+clean-telem_send-2f-src:
+	-$(RM) ./telem_send/src/TelemEncoding.d ./telem_send/src/TelemEncoding.o ./telem_send/src/telem_processor.d ./telem_send/src/telem_processor.o ./telem_send/src/telem_thread.d ./telem_send/src/telem_thread.o
 
-.PHONY: clean-audio-2f-src
+.PHONY: clean-telem_send-2f-src
 

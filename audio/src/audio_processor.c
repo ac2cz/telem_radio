@@ -47,10 +47,11 @@
 #include "audio_tools.h"
 #include "cheby_iir_filter.h"
 #include "fir_filter.h"
-#include "telem_processor.h"
 #include "oscillator.h"
 #include "dc_filter.h"
-#include "telem_thread.h"
+
+#include "../../telem_send/inc/telem_processor.h"
+#include "../../telem_send/inc/telem_thread.h"
 
 /* Forward function declarations */
 double modulate_bit();

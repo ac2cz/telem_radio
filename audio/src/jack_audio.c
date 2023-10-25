@@ -32,7 +32,8 @@
 #include "debug.h"
 #include "cmd_console.h"
 #include "audio_processor.h"
-#include "telem_thread.h"
+
+#include "../../telem_send/inc/telem_thread.h"
 
 jack_port_t *input_port;
 jack_port_t *output_port;

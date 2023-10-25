@@ -57,12 +57,13 @@
 */
 
 
+#include "../../telem_send/inc/TelemEncoding.h"
+
 #include <string.h>
 #include <assert.h>
 #include <stdio.h>
 #include <stdint.h>
 
-#include "TelemEncoding.h"
 
 #ifndef NULL
 #define NULL ((void *)0)

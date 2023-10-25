@@ -4,5 +4,5 @@
 
 USER_OBJS :=
 
-LIBS := -ljack -lm -lpthread -lbcm2835
+LIBS := -lm -lpthread -lbcm2835 -ljack
 

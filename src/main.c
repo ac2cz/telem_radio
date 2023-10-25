@@ -46,18 +46,18 @@
 #include "debug.h"
 #include "jack_audio.h"
 #include "audio_processor.h"
-#include "telem_thread.h"
 #include "gpio_interface.h"
 #include "cmd_console.h"
 #include "serial.h"
 
 /* Included for self tests */
 #include "iir_filter.h"
-#include "telem_processor.h"
 #include "audio_tools.h"
 #include "cheby_iir_filter.h"
 #include "fir_filter.h"
 #include "oscillator.h"
+#include "../telem_send/inc/telem_processor.h"
+#include "../telem_send/inc/telem_thread.h"
 
 /*
  *  GLOBAL VARIABLES defined here.  They are declared in config.h

@@ -17,6 +17,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>
  *
+ *
  * Here are the GPIO routines for telem_radio.  Call the init() function before
  * any others
  *
@@ -31,7 +32,7 @@
 #include "config.h"
 #include "debug.h"
 
-
+char i2c_buf[MAX_I2C_LEN];
 
 /**
  * Initialize the Raspberry PI GPIO.  Do nothing on Linux
@@ -39,7 +40,7 @@
 int gpio_init() {
 	int rc = EXIT_SUCCESS;
 
-    #ifdef RASPBERRY_PI
+#ifdef RASPBERRY_PI
 
 	if (!bcm2835_init()) {
         printf("Could not initialize lib\n");
@@ -48,6 +49,7 @@ int gpio_init() {
 
     if (!bcm2835_i2c_begin()) {
         printf("Could not initialize i2c, likely not running with sufficient privs\n");
+        return 1;
     } else {
         printf("Initialized i2c\n");
         bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_148);
@@ -55,6 +57,7 @@ int gpio_init() {
 /*
     if (!bcm2835_spi_begin()) {
         printf("Could not initialize spi, likely not running as root\n");
+        return 1;
     }
 */
 
@@ -66,7 +69,7 @@ int gpio_init() {
       */
      bcm2835_gpio_fsel(RPI_BPLUS_GPIO_J8_07, BCM2835_GPIO_FSEL_OUTP);
 
-    #endif /* RASPBERRY_PI */
+#endif /* RASPBERRY_PI */
 
     return rc;
 }
@@ -74,14 +77,30 @@ int gpio_init() {
 int gpio_set_ptt(int state) {
 	int rc = EXIT_SUCCESS;
 
-
-	#ifdef RASPBERRY_PI
+#ifdef RASPBERRY_PI
 	uint8_t val = LOW;
 		if (state) val = HIGH;
 	debug_print("Writing GPIO PTT to: %i\n", val);
 	bcm2835_gpio_write(GPIO_PTT, val);
-	#endif /* RASPBERRY_PI */
+#endif /* RASPBERRY_PI */
 
 	return rc;
 }
 
+uint8_t i2c_write(uint8_t slave_address, uint8_t *buf, uint32_t len) {
+	bcm2835_i2c_setSlaveAddress(slave_address);
+	uint8_t rc = bcm2835_i2c_write((char *)buf, len);
+	printf("Write Result = %d\n", rc);
+	return rc;
+}
+
+uint8_t i2c_read(uint8_t slave_address, uint8_t *buf, uint32_t len) {
+	bcm2835_i2c_setSlaveAddress(slave_address);
+	int i;
+	uint8_t rc = bcm2835_i2c_read((char *)buf, len);
+	printf("Read Result = %d\n", rc);
+	for (i=0; i<len; i++) {
+	    printf("Read Buf[%d] = %x\n", i, buf[i]);
+	}
+	return rc;
+}
