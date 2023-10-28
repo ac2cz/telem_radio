@@ -217,13 +217,19 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 #ifdef RASPBERRY_PI
 
 		/* Read the PI sensors */
-		uint32_t raw_pressure;
-		get_lp25hb_pressure(&raw_pressure);
-		debug_print("PRESSURE: %.1f mbar\n", (raw_pressure/4096.0));
+		if (lps25hb_one_shot_read() == 0) {
+			uint32_t raw_pressure;
+			get_lps25hb_pressure(&raw_pressure);
+			debug_print("PRESSURE: %.1f mbar\n", (raw_pressure/4096.0));
+			uint16_t raw_temperature;
+                	get_lps25hb_temperature(&raw_temperature);
+			/* For debug print need the signed int */
+			int16_t t = (int16_t) raw_temperature;
+			debug_print("TEMP: %.1f C\n", (42.5+t/480.0));
+		}
 
 
-
-#endif
+#endif /* RASPBERRY_PI */
 
 
 	return rc;

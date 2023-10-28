@@ -21,6 +21,10 @@
 #ifndef DEVICE_LPS25HB_H_
 #define DEVICE_LPS25HB_H_
 
+#ifdef RASPBERRY_PI
+
+#include <stdint.h>
+
 /* Chip constants */
 #define LPS25HB_ADDRESS 0x5C
 #define LPS25HB_CHIP_ID 0xBD
@@ -38,10 +42,14 @@
 #define LPS25HB_REG_PRESS_OUT_XL 0x28
 #define LPS25HB_REG_PRESS_OUT_L 0x29
 #define LPS25HB_REG_PRESS_OUT_H 0x2A
-#define LPS25HB_REG_TEMP_OUT_H 0x2B // Note these are back to front on the datasheet
-#define LPS25HB_REG_TEMP_OUT_L 0x2C
+#define LPS25HB_REG_TEMP_OUT_L 0x2B 
+#define LPS25HB_REG_TEMP_OUT_H 0x2C
 
-int init_lp25hb();
-int get_lp25hb_pressure();
+int init_lps25hb();
+int lps25hb_one_shot_read();
+int get_lps25hb_pressure(uint32_t *raw_pressure);
+int get_lps25hb_temperature(uint16_t *raw_temperature);
+
+#endif /* RASPBERRY_PI */
 
 #endif /* DEVICE_LPS25HB_H_ */

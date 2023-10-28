@@ -46,7 +46,10 @@
  * divide by 4096 hPa
  */
 
+#ifdef RASPBERRY_PI
+
 #include <stdio.h>
+#include <stdint.h>
 #include <pthread.h>
 #include "debug.h"
 #include "device_lps25hb.h"
@@ -57,7 +60,7 @@
  * Set FIFO to Bypass - default
  *
  */
-int init_lp25hb() {
+int init_lps25hb() {
     uint8_t reg[2];
     uint8_t reg2[1];
     uint8_t buf[4];
@@ -77,7 +80,11 @@ int init_lp25hb() {
     reg[1] = 0x80; // Boot
     rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
     buf[0] = 0x80;
+    int loop_safety_limit = 10000;
     while ((buf[0] & 0x80) != 0) {
+	if (--loop_safety_limit <= 0) { 
+            return 1;
+        }
         debug_print("Waiting for boot ..");
         sched_yield();
         reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
@@ -90,13 +97,14 @@ int init_lp25hb() {
     reg[1] = 0x80; // Enable chip
     rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
 
-    /* Debug - print the control registers out*/
     reg2[0] = LPS25HB_REG_CTRL_REG1; // Control Register 1
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
     if (buf[0] != 0x80) {
         debug_print("ERROR: Could not start the pressure sensor\n");
         return 1;
     }
+
+    /* Debug - print the control registers out
     debug_print("CTRL_REG1: %0x %0x\n", LPS25HB_REG_CTRL_REG1, buf[0]);
     reg2[0] = LPS25HB_REG_CTRL_REG2; // Control Register 1
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
@@ -107,11 +115,14 @@ int init_lp25hb() {
     reg2[0] = LPS25HB_REG_CTRL_REG4; // Control Register 1
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
     debug_print("CTRL_REG4: %0x %0x\n", LPS25HB_REG_CTRL_REG4, buf[0]);
-
+    */
     return rc;
 }
 
-int get_lp25hb_pressure(uint32_t *raw_pressure) {
+/* This performs a one shot read of the pressure sensor.  It
+   blocks and waits for the read to finish.  Call the funtions
+   below to retrieve the pressure and temperature */
+int lps25hb_one_shot_read() {
     uint8_t reg[1];
     uint8_t reg2[2];
     uint8_t buf[3];
@@ -123,15 +134,32 @@ int get_lp25hb_pressure(uint32_t *raw_pressure) {
     rc = i2c_write(LPS25HB_ADDRESS, reg2, 2);
 
     buf[0] = 0x01;
-    while ((buf[0] & 0x01) == 0x01) {
+    int loop_safety_limit = 10000;
+    while ((buf[0] & 0x01) == 0x01) { 
+        if (--loop_safety_limit <= 0) {
+            return BCM2835_I2C_REASON_ERROR_TIMEOUT;
+        }
         sched_yield();
         reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
         rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
     }
- 
+
+    return rc;
+}
+
+int lps25hb_read_status(uint8_t * status) {
    // reg[0] = LPS25HB_REG_STATUS_REG; // Status of the reads for P and T
    // rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
    //  debug_print("STATUS: %02x \n", buf[0]);
+    return 1;
+}
+
+/* Read the pressure registers and return as a 24 bit number.
+   Call the one shot read before reading the registers */
+int get_lps25hb_pressure(uint32_t *raw_pressure) {
+    uint8_t reg[1];
+    uint8_t buf[3];
+    int rc = 0;
 
     reg[0] = LPS25HB_REG_PRESS_OUT_XL; // Pressure LSB
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
@@ -141,17 +169,22 @@ int get_lp25hb_pressure(uint32_t *raw_pressure) {
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[2], 1);
     /* We dont have to worry about 2s complement because the pressure will not be negative in our case */
     *raw_pressure = (buf[2] << 16) + (buf[1] << 8) + buf[0];
-    //debug_print("PRESSURE: %0x %0x %0x %.1f mbar\n", buf[2], buf[1],buf[0], (p/4096.0));
 
-/*
+    return rc;
+}
+
+int get_lps25hb_temperature(uint16_t *raw_temperature) {
+    uint8_t reg[1];
+    uint8_t buf[3];
+    int rc = 0;
+
     reg[0] = LPS25HB_REG_TEMP_OUT_L; // temp LSB
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
     reg[0] = LPS25HB_REG_TEMP_OUT_H; // temp MSB
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[1], 1);
-    signed short int t = (buf[1] << 8) + buf[0];
-    debug_print("TEMP: %.1f C\n", (42.5+t/480));
-    //debug_print("TEMP: %0x %0x %.1f C\n", buf[1],buf[0], (42.5+t/480));
-*/
+    *raw_temperature = (buf[1] << 8) + buf[0];
 
     return rc;
 }
+
+#endif /* RASPBERRY_PI */
