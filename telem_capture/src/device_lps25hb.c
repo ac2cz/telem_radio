@@ -46,6 +46,9 @@
  * divide by 4096 hPa
  */
 
+#include <stdio.h>
+#include <pthread.h>
+#include "debug.h"
 #include "device_lps25hb.h"
 #include "gpio_interface.h"
 
@@ -55,10 +58,100 @@
  *
  */
 int init_lp25hb() {
-	uint8_t buf[2];
-	buf[0] = 0x0F; // WHO AM I
-	int rc = i2c_write(LPS25HB_ADDRESS, buf, 2);
-	rc = i2c_read(LPS25HB_ADDRESS, buf, 2);
+    uint8_t reg[2];
+    uint8_t reg2[1];
+    uint8_t buf[4];
+    reg[0] = LPS25HB_REG_WHO_AM_I; // Chip id
+    int rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    if (buf[0] != LPS25HB_CHIP_ID) {
+        return 1;
+    }	
 
-	return rc;
+    /* Reset the Chip */
+    reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
+    reg[1] = 0x04; // Software Reset
+    rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
+
+    /* Set the Boot bit */
+    reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
+    reg[1] = 0x80; // Boot
+    rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
+    buf[0] = 0x80;
+    while ((buf[0] & 0x80) != 0) {
+        debug_print("Waiting for boot ..");
+        sched_yield();
+        reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
+        rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    }
+    debug_print("booted\n");
+
+    /* Enable the Chip */
+    reg[0] = LPS25HB_REG_CTRL_REG1; // Control Register 1
+    reg[1] = 0x80; // Enable chip
+    rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
+
+    /* Debug - print the control registers out*/
+    reg2[0] = LPS25HB_REG_CTRL_REG1; // Control Register 1
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
+    if (buf[0] != 0x80) {
+        debug_print("ERROR: Could not start the pressure sensor\n");
+        return 1;
+    }
+    debug_print("CTRL_REG1: %0x %0x\n", LPS25HB_REG_CTRL_REG1, buf[0]);
+    reg2[0] = LPS25HB_REG_CTRL_REG2; // Control Register 1
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
+    debug_print("CTRL_REG2: %0x %0x\n", LPS25HB_REG_CTRL_REG2, buf[0]);
+    reg2[0] = LPS25HB_REG_CTRL_REG3; // Control Register 1
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
+    debug_print("CTRL_REG3: %0x %0x\n", LPS25HB_REG_CTRL_REG3, buf[0]);
+    reg2[0] = LPS25HB_REG_CTRL_REG4; // Control Register 1
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
+    debug_print("CTRL_REG4: %0x %0x\n", LPS25HB_REG_CTRL_REG4, buf[0]);
+
+    return rc;
+}
+
+int get_lp25hb_pressure(uint32_t *raw_pressure) {
+    uint8_t reg[1];
+    uint8_t reg2[2];
+    uint8_t buf[3];
+    int rc = 0;
+
+    /* Set one shot read */
+    reg2[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
+    reg2[1] = 0x01; // One shot
+    rc = i2c_write(LPS25HB_ADDRESS, reg2, 2);
+
+    buf[0] = 0x01;
+    while ((buf[0] & 0x01) == 0x01) {
+        sched_yield();
+        reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
+        rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    }
+ 
+   // reg[0] = LPS25HB_REG_STATUS_REG; // Status of the reads for P and T
+   // rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+   //  debug_print("STATUS: %02x \n", buf[0]);
+
+    reg[0] = LPS25HB_REG_PRESS_OUT_XL; // Pressure LSB
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    reg[0] = LPS25HB_REG_PRESS_OUT_L; // Pressure middle byte
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[1], 1);
+    reg[0] = LPS25HB_REG_PRESS_OUT_H; // Pressure MSB
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[2], 1);
+    /* We dont have to worry about 2s complement because the pressure will not be negative in our case */
+    *raw_pressure = (buf[2] << 16) + (buf[1] << 8) + buf[0];
+    //debug_print("PRESSURE: %0x %0x %0x %.1f mbar\n", buf[2], buf[1],buf[0], (p/4096.0));
+
+/*
+    reg[0] = LPS25HB_REG_TEMP_OUT_L; // temp LSB
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    reg[0] = LPS25HB_REG_TEMP_OUT_H; // temp MSB
+    rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[1], 1);
+    signed short int t = (buf[1] << 8) + buf[0];
+    debug_print("TEMP: %.1f C\n", (42.5+t/480));
+    //debug_print("TEMP: %0x %0x %.1f C\n", buf[1],buf[0], (42.5+t/480));
+*/
+
+    return rc;
 }

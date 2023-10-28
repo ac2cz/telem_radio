@@ -32,8 +32,6 @@
 #include "config.h"
 #include "debug.h"
 
-char i2c_buf[MAX_I2C_LEN];
-
 /**
  * Initialize the Raspberry PI GPIO.  Do nothing on Linux
  */
@@ -90,17 +88,17 @@ int gpio_set_ptt(int state) {
 uint8_t i2c_write(uint8_t slave_address, uint8_t *buf, uint32_t len) {
 	bcm2835_i2c_setSlaveAddress(slave_address);
 	uint8_t rc = bcm2835_i2c_write((char *)buf, len);
-	printf("Write Result = %d\n", rc);
 	return rc;
 }
 
 uint8_t i2c_read(uint8_t slave_address, uint8_t *buf, uint32_t len) {
 	bcm2835_i2c_setSlaveAddress(slave_address);
-	int i;
 	uint8_t rc = bcm2835_i2c_read((char *)buf, len);
-	printf("Read Result = %d\n", rc);
-	for (i=0; i<len; i++) {
-	    printf("Read Buf[%d] = %x\n", i, buf[i]);
-	}
+	return rc;
+}
+
+uint8_t i2c_read_register_rs(uint8_t slave_address, uint8_t *reg, uint8_t *buf, uint32_t len) {
+	bcm2835_i2c_setSlaveAddress(slave_address);
+	uint8_t rc = bcm2835_i2c_read_register_rs((char *)reg, (char *)buf, len);
 	return rc;
 }

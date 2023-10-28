@@ -39,6 +39,7 @@
 #include "config.h"
 #include "debug.h"
 #include "jack_audio.h"
+#include "device_lps25hb.h"
 
 #include "../../telem_send/inc/duv_telem_layout.h"
 #include "../../telem_send/inc/telem_processor.h"
@@ -216,6 +217,11 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 #ifdef RASPBERRY_PI
 
 		/* Read the PI sensors */
+		uint32_t raw_pressure;
+		get_lp25hb_pressure(&raw_pressure);
+		debug_print("PRESSURE: %.1f mbar\n", (raw_pressure/4096.0));
+
+
 
 #endif
 

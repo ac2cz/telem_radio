@@ -229,7 +229,11 @@ int main(int argc, char *argv[]) {
 		debug_print("Running on a Raspberry PI\n");
 	gpio_init();
 
-	init_lp25hb();
+	if(init_lp25hb() != 0) {
+		printf("ERROR: Can't connect to pressure sensor\n");
+	} else {
+		printf("Connected to pressure sensor\n");
+	}
 
 #endif
 
