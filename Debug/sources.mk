@@ -16,5 +16,6 @@ SUBDIRS := \
 audio/src \
 dsp/src \
 src \
+telem_capture/src \
 telem_send/src \
 

@@ -9,6 +9,7 @@ RM := rm -rf
 # All of the sources participating in the build are defined here
 -include sources.mk
 -include telem_send/src/subdir.mk
+-include telem_capture/src/subdir.mk
 -include src/subdir.mk
 -include dsp/src/subdir.mk
 -include audio/src/subdir.mk
