@@ -51,6 +51,7 @@
 #include "serial.h"
 
 #include "device_lps25hb.h"
+#include "device_ads1015.h"
 
 /* Included for self tests */
 #include "iir_filter.h"
@@ -234,6 +235,13 @@ int main(int argc, char *argv[]) {
 	} else {
 		printf("Connected to pressure sensor\n");
 	}
+
+	if(init_ads1015() != 0) {
+		printf("ERROR: Can't connect to gas sensor AtoD\n");
+	} else {
+		printf("Connected to gas sensors\n");
+	}
+
 
 #endif
 
