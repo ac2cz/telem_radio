@@ -66,6 +66,11 @@ int init_lps25hb() {
     uint8_t buf[4];
     reg[0] = LPS25HB_REG_WHO_AM_I; // Chip id
     int rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read chip id from the pressure sensor\n", rc);
+        return rc;
+    }
+
     if (buf[0] != LPS25HB_CHIP_ID) {
         return 1;
     }	
@@ -74,31 +79,51 @@ int init_lps25hb() {
     reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
     reg[1] = 0x04; // Software Reset
     rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not reset the pressure sensor\n", rc);
+        return rc;
+    }
 
     /* Set the Boot bit */
     reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
     reg[1] = 0x80; // Boot
     rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not boot the pressure sensor\n", rc);
+        return rc;
+    }
+    debug_print("Waiting for pressure sensor to boot ..");
     buf[0] = 0x80;
     int loop_safety_limit = 10000;
     while ((buf[0] & 0x80) != 0) {
 	if (--loop_safety_limit <= 0) { 
             return 1;
         }
-        debug_print("Waiting for boot ..");
         sched_yield();
         reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
         rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+        if (rc != BCM2835_I2C_REASON_OK) {
+            debug_print("Error: %d Could not read boot bit from the pressure sensor\n", rc);
+            return rc;
+        }
     }
-    debug_print("booted\n");
+    debug_print(" booted\n");
 
     /* Enable the Chip */
     reg[0] = LPS25HB_REG_CTRL_REG1; // Control Register 1
     reg[1] = 0x80; // Enable chip
     rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not Enable the pressure sensor\n", rc);
+        return rc;
+    }
 
     reg2[0] = LPS25HB_REG_CTRL_REG1; // Control Register 1
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg2, buf, 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read the pressure sensor\n", rc);
+        return rc;
+    }
     if (buf[0] != 0x80) {
         debug_print("ERROR: Could not start the pressure sensor\n");
         return 1;
@@ -132,6 +157,10 @@ int lps25hb_one_shot_read() {
     reg2[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
     reg2[1] = 0x01; // One shot
     rc = i2c_write(LPS25HB_ADDRESS, reg2, 2);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not write to the pressure sensor\n", rc);
+        return rc;
+    }
 
     buf[0] = 0x01;
     int loop_safety_limit = 10000;
@@ -142,6 +171,10 @@ int lps25hb_one_shot_read() {
         sched_yield();
         reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
         rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+        if (rc != BCM2835_I2C_REASON_OK) {
+            debug_print("Error: %d Could not read one shot status from the pressure sensor\n", rc);
+            return rc;
+        }
     }
 
     return rc;
@@ -163,10 +196,22 @@ int get_lps25hb_pressure(uint32_t *raw_pressure) {
 
     reg[0] = LPS25HB_REG_PRESS_OUT_XL; // Pressure LSB
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read pressure from the pressure sensor\n", rc);
+        return rc;
+    }
     reg[0] = LPS25HB_REG_PRESS_OUT_L; // Pressure middle byte
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[1], 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read pressure from the pressure sensor\n", rc);
+        return rc;
+    }
     reg[0] = LPS25HB_REG_PRESS_OUT_H; // Pressure MSB
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[2], 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read pressure from the pressure sensor\n", rc);
+        return rc;
+    }
     /* We dont have to worry about 2s complement because the pressure will not be negative in our case */
     *raw_pressure = (buf[2] << 16) + (buf[1] << 8) + buf[0];
 
@@ -180,8 +225,16 @@ int get_lps25hb_temperature(uint16_t *raw_temperature) {
 
     reg[0] = LPS25HB_REG_TEMP_OUT_L; // temp LSB
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read temperature from the pressure sensor\n", rc);
+        return rc;
+    }
     reg[0] = LPS25HB_REG_TEMP_OUT_H; // temp MSB
     rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, &buf[1], 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read temperature from the pressure sensor\n", rc);
+        return rc;
+    }
     *raw_temperature = (buf[1] << 8) + buf[0];
 
     return rc;

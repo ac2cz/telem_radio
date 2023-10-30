@@ -228,18 +228,19 @@ int main(int argc, char *argv[]) {
 #ifdef RASPBERRY_PI
 	if (!filter_test_num)
 		debug_print("Running on a Raspberry PI\n");
-	gpio_init();
-
-	if(init_lps25hb() != 0) {
-		printf("ERROR: Can't connect to pressure sensor\n");
+	if(gpio_init() != 0) {
+		printf("ERROR: Could not initialize GPIO\n");
 	} else {
-		printf("Connected to pressure sensor\n");
-	}
-
-	if(init_ads1015() != 0) {
-		printf("ERROR: Can't connect to gas sensor AtoD\n");
-	} else {
-		printf("Connected to gas sensors\n");
+	    if(init_lps25hb() != 0) {
+	    	printf("ERROR: Can't connect to pressure sensor\n");
+	    } else {
+	    	printf("Connected to pressure sensor\n");
+	    }
+	    if(init_ads1015() != 0) {
+	    	printf("ERROR: Can't connect to gas sensor AtoD\n");
+	    } else {
+	    	printf("Connected to gas sensors\n");
+	    }
 	}
 
 

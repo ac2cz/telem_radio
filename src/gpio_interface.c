@@ -41,20 +41,19 @@ int gpio_init() {
 #ifdef RASPBERRY_PI
 
 	if (!bcm2835_init()) {
-        printf("Could not initialize lib\n");
+        debug_print("Could not initialize lib\n");
         return 1;
     }
 
     if (!bcm2835_i2c_begin()) {
-        printf("Could not initialize i2c, likely not running with sufficient privs\n");
+        debug_print("Could not initialize i2c, likely not running with sufficient privs\n");
         return 1;
     } else {
-        printf("Initialized i2c\n");
         bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_148);
     }
 /*
     if (!bcm2835_spi_begin()) {
-        printf("Could not initialize spi, likely not running as root\n");
+        debug_print("Could not initialize spi, likely not running as root\n");
         return 1;
     }
 */

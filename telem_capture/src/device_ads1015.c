@@ -34,19 +34,55 @@
  * Initialize the chip
  *
  */
-int init_ads() {
-    uint8_t reg[2];
-    uint8_t reg2[1];
-    uint8_t buf[4];
-    reg[0] = ADS1015_REG_CONFIG; 
-    int rc = i2c_read_register_rs(ADS1015_ADDRESS, reg, buf, 2);
-    debug_print("ADS1015 CONFIG %02x %02x\n",buf[0], buf[1]);
+int init_ads1015() {
+    uint8_t reg[1];
+    uint8_t buf[3];
+    uint8_t rbuf[3];
+    int rc = 0;
 
-    /* Set the Boot bit 
-    reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
-    reg[1] = 0x80; // Boot
-    rc = i2c_write(LPS25HB_ADDRESS, reg, 2);
-    */
+    /* Reset the chip and perhaps all others */
+    reg[0] = 0x06; 
+//    rc = i2c_write(0x00, reg, 1);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not reset the AtoD\n", rc);
+        return rc;
+    }
+
+    reg[0] = ADS1015_REG_CONFIG; 
+    rc = i2c_write(ADS1015_ADDRESS, reg, 1);
+    rc = i2c_read(ADS1015_ADDRESS, rbuf, 2);
+    debug_print("ADS1015 CONFIG %02x %02x \n",rbuf[0], rbuf[1] );
+
+    buf[0] = ADS1015_REG_CONFIG;
+//    buf[1] = 0x55; // AIN1 input and Gain +- 2.048V - default, single shot mode
+    buf[1] = 0xD5; // START CONVERSION and AIN1 input and Gain +- 2.048V - default, single shot mode
+    buf[2] = 0x83; // Ignore Conversion and Coparator settings.
+//    rc = i2c_write(ADS1015_ADDRESS, buf, 3);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not write to the AtoD\n", rc);
+        return rc;
+    }
+
+    /* Read 2 bytes from register */
+
+    rbuf[0] = 0xAA;
+    rbuf[1] = 0xAA;
+    rbuf[2] = 0xAA;
+    reg[0] = ADS1015_REG_CONFIG; 
+    //reg[0] = ADS1015_REG_CONVERSION; 
+//    rc = i2c_write(ADS1015_ADDRESS, reg, 1);
+//    if (rc != BCM2835_I2C_REASON_OK) {
+//        debug_print("Error: %d Could not write read address to the AtoD\n", rc);
+//        return rc;
+//    }
+
+//    bcm2835_i2c_setSlaveAddress(ADS1015_ADDRESS);
+//    rc = bcm2835_i2c_read_register_rs((char *)reg, (char *)rbuf, 3);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read config from the AtoD\n", rc);
+        return rc;
+    }
+
     return rc;
 }
 
