@@ -4,12 +4,18 @@
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
+../telem_capture/src/device_ads1015.c \
+../telem_capture/src/device_ds3231.c \
 ../telem_capture/src/device_lps25hb.c 
 
 C_DEPS += \
+./telem_capture/src/device_ads1015.d \
+./telem_capture/src/device_ds3231.d \
 ./telem_capture/src/device_lps25hb.d 
 
 OBJS += \
+./telem_capture/src/device_ads1015.o \
+./telem_capture/src/device_ds3231.o \
 ./telem_capture/src/device_lps25hb.o 
 
 
@@ -25,7 +31,7 @@ telem_capture/src/%.o: ../telem_capture/src/%.c telem_capture/src/subdir.mk
 clean: clean-telem_capture-2f-src
 
 clean-telem_capture-2f-src:
-	-$(RM) ./telem_capture/src/device_lps25hb.d ./telem_capture/src/device_lps25hb.o
+	-$(RM) ./telem_capture/src/device_ads1015.d ./telem_capture/src/device_ads1015.o ./telem_capture/src/device_ds3231.d ./telem_capture/src/device_ds3231.o ./telem_capture/src/device_lps25hb.d ./telem_capture/src/device_lps25hb.o
 
 .PHONY: clean-telem_capture-2f-src
 

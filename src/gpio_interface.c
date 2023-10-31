@@ -66,9 +66,31 @@ int gpio_init() {
       */
      bcm2835_gpio_fsel(RPI_BPLUS_GPIO_J8_07, BCM2835_GPIO_FSEL_OUTP);
 
+     /*
+      * Set pin 18 on connector J8 as OUTPUT
+      * This is the RTC Reset line
+      */
+     bcm2835_gpio_fsel(RPI_BPLUS_GPIO_J8_18, BCM2835_GPIO_FSEL_OUTP);
+
 #endif /* RASPBERRY_PI */
 
     return rc;
+}
+
+int gpio_exit() {
+
+#ifdef RASPBERRY_PI
+
+    bcm2835_i2c_end();
+/*
+    if (!bcm2835_spi_end()) {
+        debug_print("Could not end spi, likely not running as root\n");
+    }
+*/
+
+	bcm2835_close();
+#endif
+	return EXIT_SUCCESS;
 }
 
 int gpio_set_ptt(int state) {

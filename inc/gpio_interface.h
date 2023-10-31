@@ -48,6 +48,7 @@ For further information, please refer to https://pinout.xyz/
 #include <bcm2835.h>
 
 #define GPIO_PTT RPI_BPLUS_GPIO_J8_07 // GPIO4
+#define GPIO_RTC_RTS_GPIO_J8_18 // GPIO24 - Reset Line to the RTC
 #define MODE_READ 0
 #define MODE_WRITE 1
 #define MAX_I2C_LEN 32
@@ -63,6 +64,7 @@ For further information, please refer to https://pinout.xyz/
 #endif /* NOT RASPBERRY_PI */
 
 int gpio_init();
+int gpio_exit();
 int gpio_set_ptt(int state);
 uint8_t i2c_write(uint8_t slave_address, uint8_t *buf, uint32_t len);
 uint8_t i2c_read(uint8_t slave_address, uint8_t *buf, uint32_t len);

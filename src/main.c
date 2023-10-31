@@ -305,6 +305,9 @@ int main(int argc, char *argv[]) {
     	exit(rc);
     }
 
+#ifdef RASPBERRY_PI
+    gpio_exit();
+#endif
     closeserial(g_serial_fd);
     telem_thread_stop();
     cleanup_telem_processor();
