@@ -71,6 +71,9 @@ int gpio_init() {
       * This is the RTC Reset line
       */
      bcm2835_gpio_fsel(RPI_BPLUS_GPIO_J8_18, BCM2835_GPIO_FSEL_OUTP);
+     bcm2835_gpio_set_pud(RPI_BPLUS_GPIO_J8_18, BCM2835_GPIO_PUD_UP);
+//     debug_print("Writing GPIO PIn 18 to: %i\n", HIGH);
+     bcm2835_gpio_write(GPIO_PTT, HIGH);
 
 #endif /* RASPBERRY_PI */
 
