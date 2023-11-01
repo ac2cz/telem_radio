@@ -50,6 +50,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <pthread.h>
 #include "debug.h"
 #include "device_lps25hb.h"
@@ -94,10 +95,10 @@ int init_lps25hb() {
     }
     debug_print("Waiting for pressure sensor to boot ..");
     buf[0] = 0x80;
-    int loop_safety_limit = 10000;
+    int loop_safety_limit = 1000000;
     while ((buf[0] & 0x80) != 0) {
 	if (--loop_safety_limit <= 0) { 
-            return 1;
+            return 10; // Loop error
         }
         sched_yield();
         reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
@@ -158,15 +159,15 @@ int lps25hb_one_shot_read() {
     reg2[1] = 0x01; // One shot
     rc = i2c_write(LPS25HB_ADDRESS, reg2, 2);
     if (rc != BCM2835_I2C_REASON_OK) {
-        debug_print("Error: %d Could not write to the pressure sensor\n", rc);
+        debug_print("Error: %d Could not write one shot to the pressure sensor\n", rc);
         return rc;
     }
 
     buf[0] = 0x01;
-    int loop_safety_limit = 10000;
+    int loop_safety_limit = 1000000;
     while ((buf[0] & 0x01) == 0x01) { 
         if (--loop_safety_limit <= 0) {
-            return BCM2835_I2C_REASON_ERROR_TIMEOUT;
+            return 10; // Loop error
         }
         sched_yield();
         reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2

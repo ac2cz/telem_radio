@@ -49,7 +49,10 @@ int gpio_init() {
         debug_print("Could not initialize i2c, likely not running with sufficient privs\n");
         return 1;
     } else {
-        bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_148);
+        bcm2835_i2c_set_baudrate(100000); // 100kHz
+        //bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_150); // 1.666MHz 
+        //bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_626); // 400kHz
+        //bcm2835_i2c_setClockDivider(BCM2835_I2C_CLOCK_DIVIDER_2500); // 100kHz
     }
 /*
     if (!bcm2835_spi_begin()) {
@@ -68,12 +71,10 @@ int gpio_init() {
 
      /*
       * Set pin 18 on connector J8 as OUTPUT
-      * This is the RTC Reset line
+      * This is the RTC Reset line.  Has a pull up resistor defined.
       */
      bcm2835_gpio_fsel(RPI_BPLUS_GPIO_J8_18, BCM2835_GPIO_FSEL_OUTP);
      bcm2835_gpio_set_pud(RPI_BPLUS_GPIO_J8_18, BCM2835_GPIO_PUD_UP);
-//     debug_print("Writing GPIO PIn 18 to: %i\n", HIGH);
-     bcm2835_gpio_write(GPIO_PTT, HIGH);
 
 #endif /* RASPBERRY_PI */
 

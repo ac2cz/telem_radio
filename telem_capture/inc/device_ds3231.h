@@ -27,29 +27,17 @@
 #include <stdint.h>
 
 /* Chip constants */
-#define LPS25HB_ADDRESS 0x5C
-#define LPS25HB_CHIP_ID 0xBD
+#define DS3231_ADDRESS 0x68
 
 /* Registers */
-#define LPS25HB_REG_REF_P_XL 0x08
-#define LPS25HB_REG_REF_P_L 0x09
-#define LPS25HB_REG_REF_P_H 0x0A
-#define LPS25HB_REG_WHO_AM_I 0x0F
-#define LPS25HB_REG_CTRL_REG1 0x20
-#define LPS25HB_REG_CTRL_REG2 0x21
-#define LPS25HB_REG_CTRL_REG3 0x22
-#define LPS25HB_REG_CTRL_REG4 0x23
-#define LPS25HB_REG_STATUS_REG 0x27
-#define LPS25HB_REG_PRESS_OUT_XL 0x28
-#define LPS25HB_REG_PRESS_OUT_L 0x29
-#define LPS25HB_REG_PRESS_OUT_H 0x2A
-#define LPS25HB_REG_TEMP_OUT_L 0x2B
-#define LPS25HB_REG_TEMP_OUT_H 0x2C
+#define DS3231_REG_SECONDS 0x00
+#define DS3231_REG_CONTROL 0x0E
+#define DS3231_REG_STATUS 0x0F
 
-int init_lps25hb();
-int lps25hb_one_shot_read();
-int get_lps25hb_pressure(uint32_t *raw_pressure);
-int get_lps25hb_temperature(uint16_t *raw_temperature);
+int init_ds3231();
+int reset_ds3231();
+int ds3231_get_time();
+int ds3231_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint8_t hour, uint8_t min, uint8_t sec);
 
 #endif /* RASPBERRY_PI */
 

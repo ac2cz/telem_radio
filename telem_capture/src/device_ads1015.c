@@ -54,34 +54,50 @@ int init_ads1015() {
     debug_print("ADS1015 CONFIG %02x %02x \n",rbuf[0], rbuf[1] );
 
     buf[0] = ADS1015_REG_CONFIG;
-//    buf[1] = 0x55; // AIN1 input and Gain +- 2.048V - default, single shot mode
     buf[1] = 0xD5; // START CONVERSION and AIN1 input and Gain +- 2.048V - default, single shot mode
     buf[2] = 0x83; // Ignore Conversion and Coparator settings.
-//    rc = i2c_write(ADS1015_ADDRESS, buf, 3);
+    rc = i2c_write(ADS1015_ADDRESS, buf, 3);
     if (rc != BCM2835_I2C_REASON_OK) {
-        debug_print("Error: %d Could not write to the AtoD\n", rc);
+        debug_print("Error: %d Could not write config to the ADC\n", rc);
         return rc;
     }
+
+/*
+    buf[0] = 0x80;
+    int loop_safety_limit = 1000000;
+    while ((buf[0] & 0x01) == 0x01) {
+        if (--loop_safety_limit <= 0) {
+            return BCM2835_I2C_REASON_ERROR_TIMEOUT;
+        }
+        sched_yield();
+        reg[0] = LPS25HB_REG_CTRL_REG2; // Control Register 2
+        rc = i2c_read_register_rs(LPS25HB_ADDRESS, reg, buf, 1);
+        if (rc != BCM2835_I2C_REASON_OK) {
+            debug_print("Error: %d Could not read one shot status from the pressure sensor\n", rc);
+            return rc;
+        }
+    }
+*/
 
     /* Read 2 bytes from register */
 
     rbuf[0] = 0xAA;
     rbuf[1] = 0xAA;
     rbuf[2] = 0xAA;
-    reg[0] = ADS1015_REG_CONFIG; 
-    //reg[0] = ADS1015_REG_CONVERSION; 
-//    rc = i2c_write(ADS1015_ADDRESS, reg, 1);
-//    if (rc != BCM2835_I2C_REASON_OK) {
-//        debug_print("Error: %d Could not write read address to the AtoD\n", rc);
-//        return rc;
-//    }
-
-//    bcm2835_i2c_setSlaveAddress(ADS1015_ADDRESS);
-//    rc = bcm2835_i2c_read_register_rs((char *)reg, (char *)rbuf, 3);
+    //reg[0] = ADS1015_REG_CONFIG; 
+    reg[0] = ADS1015_REG_CONVERSION; 
+    rc = i2c_write(ADS1015_ADDRESS, reg, 1);
     if (rc != BCM2835_I2C_REASON_OK) {
-        debug_print("Error: %d Could not read config from the AtoD\n", rc);
+        debug_print("Error: %d Could not write read address to the ADC\n", rc);
         return rc;
     }
+
+    rc = i2c_read(ADS1015_ADDRESS, rbuf, 2);
+    if (rc != BCM2835_I2C_REASON_OK) {
+        debug_print("Error: %d Could not read config from the ADC\n", rc);
+        return rc;
+    }
+    debug_print("ADS1015 ADC %02x %02x \n",rbuf[0], rbuf[1] );
 
     return rc;
 }

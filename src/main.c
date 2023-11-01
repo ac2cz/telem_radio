@@ -51,6 +51,7 @@
 #include "serial.h"
 
 #include "device_lps25hb.h"
+#include "device_ds3231.h"
 #include "device_ads1015.h"
 
 /* Included for self tests */
@@ -231,20 +232,32 @@ int main(int argc, char *argv[]) {
 	if(gpio_init() != 0) {
 		printf("ERROR: Could not initialize GPIO\n");
 	} else {
+#ifdef PRESSURE_SENSOR
 	    if(init_lps25hb() != 0) {
 	    	printf("ERROR: Can't connect to pressure sensor\n");
 	    } else {
 	    	printf("Connected to pressure sensor\n");
 	    }
+#endif
+#ifdef REAL_TIME_CLOCK
+	    if(init_ds3231() != 0) {
+	    	printf("ERROR: Can't connect to RTC\n");
+	    } else {
+	    	printf("Connected to RTC\n");
+	    }
+//ds3231_set_time(23, 11, 1, 3, 12, 22, 00);
+#endif
+#ifdef GAS_SENSOR_ADC
 	    if(init_ads1015() != 0) {
 	    	printf("ERROR: Can't connect to gas sensor AtoD\n");
 	    } else {
 	    	printf("Connected to gas sensors\n");
 	    }
+#endif
 	}
 
 
-#endif
+#endif /* RASPBERRY_PI */
 
 #ifdef LINUX
 	if (!filter_test_num)

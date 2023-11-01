@@ -40,6 +40,7 @@
 #include "debug.h"
 #include "jack_audio.h"
 #include "device_lps25hb.h"
+#include "device_ds3231.h"
 
 #include "../../telem_send/inc/duv_telem_layout.h"
 #include "../../telem_send/inc/telem_processor.h"
@@ -217,6 +218,7 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 #ifdef RASPBERRY_PI
 
 		/* Read the PI sensors */
+#ifdef PRESSURE_SENSOR
 		if (lps25hb_one_shot_read() == 0) {
 			uint32_t raw_pressure;
 			get_lps25hb_pressure(&raw_pressure);
@@ -227,6 +229,10 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 			int16_t t = (int16_t) raw_temperature;
 			debug_print("TEMP: %.1f C\n", (42.5+t/480.0));
 		}
+#endif
+#ifdef REAL_TIME_CLOCK
+        ds3231_get_time();
+#endif
 
 
 #endif /* RASPBERRY_PI */

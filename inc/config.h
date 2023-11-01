@@ -26,6 +26,13 @@
 #define VERSION __DATE__ " - Version 0.5"
 #define DEBUG 1
 //#define PTT_WITH_GPIO
+
+
+/* These defines control if the sensors are enabled */
+//#define PRESSURE_SENSOR
+//#define GAS_SENSOR_ADC
+#define REAL_TIME_CLOCK
+
 #define true 1
 #define false 0
 #define EPOCH_START_YEAR 2000
