@@ -245,7 +245,7 @@ int main(int argc, char *argv[]) {
 	    } else {
 	    	printf("Connected to RTC\n");
 	    }
-//ds3231_set_time(23, 11, 1, 3, 12, 22, 00);
+//ds3231_set_time(23, 11, 1, 3, 13, 22, 00);
 #endif
 #ifdef GAS_SENSOR_ADC
 	    if(init_ads1015() != 0) {

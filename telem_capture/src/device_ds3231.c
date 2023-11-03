@@ -138,6 +138,13 @@ int reset_ds3231() {
    sec 0 - 59 */
 int ds3231_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint8_t hour,
                    uint8_t min, uint8_t sec) {
+    if (year < 0 || year > 99) return 1;
+    if (month < 1 || month > 12) return 1;
+    if (day < 1 || day > 31) return 1;
+    if (dow < 1 || dow > 7) return 1;
+    if (hour < 0 || hour > 23) return 1;
+    if (min < 0 || min > 59) return 1;
+    if (sec < 0 || sec > 59) return 1;
     uint8_t reg[2];
     int rc = 0;
 
@@ -155,18 +162,21 @@ int ds3231_set_time(uint16_t year, uint8_t month, uint8_t day, uint8_t dow, uint
         return rc;
     }
 
+    reg[0] = DS3231_REG_STATUS;
     rc = i2c_read_register_rs(DS3231_ADDRESS, reg, buf, 1);
     if (rc != BCM2835_I2C_REASON_OK) {
         debug_print("Error: %d Could not read status from the RTC\n", rc);
         return rc;
     }
 
-    reg[0] = DS3231_REG_SECONDS;
-    reg[1] = buf[0] &  ~0x80; // flip OSF bit
-    rc = i2c_write(DS3231_ADDRESS, reg, 2);
-    if (rc != BCM2835_I2C_REASON_OK) {
-        debug_print("Error: %d Could not flip RTC OSF bit\n", rc);
-        return rc;
+    if ((buf[0] & 0x80) == 0x80) { /* Osc is stopped, so start it */
+        debug_print("Osc was stopped, starting it\n");
+        reg[1] = buf[0] &  ~0x80; // flip OSF bit
+        rc = i2c_write(DS3231_ADDRESS, reg, 2);
+        if (rc != BCM2835_I2C_REASON_OK) {
+            debug_print("Error: %d Could not flip RTC OSF bit\n", rc);
+            return rc;
+        }
     }
 
     return 0;
@@ -214,8 +224,8 @@ int ds3231_get_time() {
         debug_print("Error: %d Could not write control reg on RTS\n", rc);
         return rc;
     }
-    debug_print("%02x %02x %02x\n",buf[2], buf[1], buf[0]);
-    debug_print("%02x %02x %02x %02x\n",buf[6], buf[5], buf[4], buf[3]);
+//    debug_print("%02x %02x %02x\n",buf[2], buf[1], buf[0]);
+//   debug_print("%02x %02x %02x %02x\n",buf[6], buf[5], buf[4], buf[3]);
 
     struct tm tm_time;
     rtc_regs_to_time(&tm_time, buf);

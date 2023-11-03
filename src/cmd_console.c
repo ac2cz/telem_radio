@@ -16,8 +16,9 @@
 #include "oscillator.h"
 #include "gpio_interface.h"
 #include "serial.h"
-#include "../telem_send/inc/duv_telem_layout.h"
-#include "../telem_send/inc/telem_processor.h"
+#include "duv_telem_layout.h"
+#include "telem_processor.h"
+#include "device_ds3231.h"
 
 /* Forward function declarations */
 void print_status(char *name, int status);
@@ -36,6 +37,7 @@ char *help_str =
 		" test          - DUV telem contains only 101010 on/off\n"
 		" tone          - Generate test tone\n"
 		" freq <Hz>     - Set freq of test tone\n"
+		" time <YY MM DD HH MM SS>     - Set time of the RTC\n"
 		" measure       - Display measurement for input tone\n"
 		" (v)verbose    - Toggle verbose output for debugging"
 		" (h)help       - show this help\n"
@@ -152,6 +154,32 @@ int start_cmd_console() {
 					set_test_tone_freq(freq);
 					printf("Test tone frequency now: %d Hz\n", (int)get_test_tone_freq());
 				}
+			} else if (strcmp(token, "time") == 0) {
+				token = strsep(&line, " ");
+				if (token == NULL) {
+					ds3231_get_time();
+				} else {
+					int year = -1, month = -1, day = -1, hour = -1, min = -1, sec = -1;
+					year = atoi(token);
+					if ((token = strsep(&line, " ")) != NULL) 
+						month = atoi(token);
+					if ((token = strsep(&line, " ")) != NULL) 
+						day = atoi(token);
+					if ((token = strsep(&line, " ")) != NULL) 
+						hour = atoi(token);
+					if ((token = strsep(&line, " ")) != NULL) 
+						min = atoi(token);
+					if ((token = strsep(&line, " ")) != NULL) 
+						sec = atoi(token);
+				int dow = 1;
+				int rc = ds3231_set_time(year, month, day, dow, hour, min, sec);
+				if (rc) {
+					printf("Invalid date time format.  Use YY MM DD HH MM SS\n");
+				} else {
+					printf("Time now: ");
+					ds3231_get_time();
+				}
+				} 
 			} else if (strcmp(token, "tone") == 0) {
 				set_send_test_tone(!get_send_test_tone());
 				print_status("Send Test Tone", get_send_test_tone());

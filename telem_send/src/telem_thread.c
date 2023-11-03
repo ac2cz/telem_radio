@@ -231,7 +231,7 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		}
 #endif
 #ifdef REAL_TIME_CLOCK
-        ds3231_get_time();
+        //ds3231_get_time();
 #endif
 
 
