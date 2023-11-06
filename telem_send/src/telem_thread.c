@@ -247,7 +247,7 @@ int gather_duv_telemetry(uint8_t type) {
 			telem_buffer.exp.temperature = raw_temperature;
 			/* For debug print need the signed int */
 			int16_t t = (int16_t) raw_temperature;
-			debug_print(" (Chip temp: %.1f C)\n", (42.5+t/480.0));
+			verbose_print(" (Chip temp: %.1f C)\n", (42.5+t/480.0));
 		}
 #endif
 #ifdef REAL_TIME_CLOCK

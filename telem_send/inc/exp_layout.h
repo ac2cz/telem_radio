@@ -1,6 +1,6 @@
 typedef struct __attribute__((__packed__)) {
     unsigned int temperature : 16;
-    unsigned int pressure : 16;
+    unsigned int pressure : 32;
     unsigned int humidity : 16;
     unsigned int gas_sensor1 : 16;
     unsigned int gas_sensor2 : 16;
@@ -21,11 +21,8 @@ typedef struct __attribute__((__packed__)) {
     unsigned int radiation : 16;
     unsigned int cosmic_rays : 16;
     unsigned int pad1 : 12;
-    unsigned int pad2 : 32;
+    unsigned int pad2 : 16;
     unsigned int pad3 : 32;
     unsigned int pad4 : 32;
     unsigned int pad5 : 32;
 } exptelemetry_t;
-
-
-
