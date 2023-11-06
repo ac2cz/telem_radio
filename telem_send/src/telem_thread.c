@@ -35,15 +35,17 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sched.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "debug.h"
 #include "jack_audio.h"
 #include "device_lps25hb.h"
 #include "device_ds3231.h"
+#include "device_ads1015.h"
 
-#include "../../telem_send/inc/duv_telem_layout.h"
-#include "../../telem_send/inc/telem_processor.h"
+#include "duv_telem_layout.h"
+#include "telem_processor.h"
 
 /* Forward function definitions */
 int gather_duv_telemetry(int type, duv_packet_t *packet);
@@ -201,11 +203,6 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		}
 		if (g_verbose)
 			print_duv_packet(packet);
-#ifdef RASPBERRY_PI
-#endif
-#ifndef LINUX
-
-#endif
 
 		/* Audio loop time */
 		packet->payload.loop_time = get_loop_time_microsec()/100;
@@ -222,16 +219,35 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		if (lps25hb_one_shot_read() == 0) {
 			uint32_t raw_pressure;
 			get_lps25hb_pressure(&raw_pressure);
-			debug_print("PRESSURE: %.1f mbar\n", (raw_pressure/4096.0));
+			debug_print("PRESSURE: %.1f mbar ", (raw_pressure/4096.0));
 			uint16_t raw_temperature;
                 	get_lps25hb_temperature(&raw_temperature);
 			/* For debug print need the signed int */
 			int16_t t = (int16_t) raw_temperature;
-			debug_print("TEMP: %.1f C\n", (42.5+t/480.0));
+			debug_print(" (Chip temp: %.1f C)\n", (42.5+t/480.0));
 		}
 #endif
 #ifdef REAL_TIME_CLOCK
         //ds3231_get_time();
+#endif
+#ifdef GAS_SENSOR_ADC
+int16_t result;
+     int g; 
+     g = ads1015_read(CHANNEL_AIN1_FSR_6V, &result);
+     if (g == 0) {
+         printf("MQ-2 Gas: %d %fV\n",result, 6.144*result/32767.0);
+     }
+
+     g = ads1015_read(CHANNEL_AIN2_FSR_6V, &result);
+     if (g == 0) {
+         printf("MQ-6 Gas: %d %fV\n",result, 6.144*result/32767.0);
+     }
+/*
+     g = ads1015_read(CHANNEL_AIN3_FSR_6V, &result);
+     if (g == 0) {
+         printf("MQ-135 Gas: %d %fV\n",result, 6.144*result/32767.0);
+     }
+*/
 #endif
 
 

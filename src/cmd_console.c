@@ -155,6 +155,7 @@ int start_cmd_console() {
 					printf("Test tone frequency now: %d Hz\n", (int)get_test_tone_freq());
 				}
 			} else if (strcmp(token, "time") == 0) {
+#ifdef REAL_TIME_CLOCK
 				token = strsep(&line, " ");
 				if (token == NULL) {
 					ds3231_get_time();
@@ -180,6 +181,7 @@ int start_cmd_console() {
 					ds3231_get_time();
 				}
 				} 
+#endif
 			} else if (strcmp(token, "tone") == 0) {
 				set_send_test_tone(!get_send_test_tone());
 				print_status("Send Test Tone", get_send_test_tone());

@@ -29,8 +29,8 @@
 
 
 /* These defines control if the sensors are enabled */
-//#define PRESSURE_SENSOR
-//#define GAS_SENSOR_ADC
+#define PRESSURE_SENSOR
+#define GAS_SENSOR_ADC
 #define REAL_TIME_CLOCK
 
 #define true 1

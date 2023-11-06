@@ -34,7 +34,14 @@
 #define ADS1015_REG_LOW_THRESH 0x02
 #define ADS1015_REG_HIGH_THRESH 0x03
 
+
+#define CHANNEL_AIN0_FSR_6V 0xC1
+#define CHANNEL_AIN1_FSR_6V 0xD1
+#define CHANNEL_AIN2_FSR_6V 0xE1
+#define CHANNEL_AIN3_FSR_6V 0xF1
+
 int init_ads1015();
+int ads1015_read(uint8_t channel, int16_t *result); 
 
 #endif /* RASPBERRY_PI */
 
