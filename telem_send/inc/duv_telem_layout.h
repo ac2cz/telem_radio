@@ -22,6 +22,8 @@
 #ifndef DUV_TELEM_LAYOUT_H_
 #define DUV_TELEM_LAYOUT_H_
 
+#include "exp_layout.h"
+
 /* Header */
 typedef struct __attribute__((__packed__)) {
 	unsigned int id :			3;
@@ -65,5 +67,10 @@ typedef struct __attribute__((__packed__)) {
 	duv_header_t header;
 	rttelemetry_t payload;
 } duv_packet_t;
+
+typedef struct __attribute__((__packed__)) {
+	duv_header_t header;
+	exptelemetry_t payload;
+} exp_packet_t;
 
 #endif /* DUV_TELEM_LAYOUT_H_ */

@@ -155,6 +155,7 @@ int start_cmd_console() {
 					printf("Test tone frequency now: %d Hz\n", (int)get_test_tone_freq());
 				}
 			} else if (strcmp(token, "time") == 0) {
+#ifdef RASPBERRY_PI
 #ifdef REAL_TIME_CLOCK
 				token = strsep(&line, " ");
 				if (token == NULL) {
@@ -182,6 +183,7 @@ int start_cmd_console() {
 				}
 				} 
 #endif
+#endif /* RASPBERRY_PI */
 			} else if (strcmp(token, "tone") == 0) {
 				set_send_test_tone(!get_send_test_tone());
 				print_status("Send Test Tone", get_send_test_tone());

@@ -89,10 +89,10 @@ void init_rd_state() {
  * packet is finished.  The caller is responsible for working out which buffer to use
  *
  */
-int encode_next_packet(duv_packet_t *packet, int encoded_packet_num) {
+int encode_next_packet(unsigned char *packet, int encoded_packet_num) {
 	int rc = EXIT_SUCCESS;
 	//debug_print("DEBUG: Getting next packet\n");
-	encode_duv_telem_packet((unsigned char *)packet, encoded_packet[encoded_packet_num]);
+	encode_duv_telem_packet(packet, encoded_packet[encoded_packet_num]);
 	return rc;
 }
 

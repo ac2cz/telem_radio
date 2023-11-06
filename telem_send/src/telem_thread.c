@@ -48,7 +48,7 @@
 #include "telem_processor.h"
 
 /* Forward function definitions */
-int gather_duv_telemetry(int type, duv_packet_t *packet);
+int gather_duv_telemetry(uint8_t type);
 void print_duv_packet(duv_packet_t *packet);
 void print_duv_header(duv_header_t header);
 void print_rttelemetry(rttelemetry_t payload);
@@ -60,6 +60,18 @@ int running = true;
 pthread_mutex_t fill_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
 int fill_packet = true;
 int packet_num = 1; // The buffer that is ready to send.  Initialize to one so that on the first pass through we fill buffer zero
+
+typedef struct {
+    duv_header_t header;
+    rttelemetry_t rtHealth;
+    exptelemetry_t exp;
+} telem_buffer_t;
+
+/* Allocate a static buffer to store the telemetry when it is collected */
+telem_buffer_t telem_buffer;
+
+duv_packet_t realtimeFrame;
+exp_packet_t experimentFrame;
 
 /**
  * Main process of the telem thread.  This is called when the pthread is created.
@@ -78,7 +90,7 @@ void *telem_thread_process(void * arg) {
 	debug_print("Starting Thread: %s\n", name);
 
 	/* Initialize */
-	telem_packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
+//	telem_packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
 
 	/* Run until stopped */
 	while (running) {
@@ -89,13 +101,23 @@ void *telem_thread_process(void * arg) {
 			pthread_mutex_unlock( &fill_packet_mutex );
 			int packet_buffer_to_fill = !packet_num; // toggle the buffer so we fill the other one
 
-			int type = 1;
-			int rc = gather_duv_telemetry(type, telem_packet);
+			int type = 2;
+			int rc = gather_duv_telemetry(type);
 			if (rc != 0) {
 				error_print("Error creating telemetry packet\n");
 			}
 
-			encode_next_packet(telem_packet, packet_buffer_to_fill);
+//			realtimeFrame.header = telem_buffer.header;
+//			realtimeFrame.payload = telem_buffer.rtHealth;
+//			int len = sizeof(realtimeFrame);
+//			encode_next_packet((unsigned char *)&realtimeFrame, packet_buffer_to_fill);
+
+			experimentFrame.header = telem_buffer.header;
+			experimentFrame.payload = telem_buffer.exp;
+			//int len = sizeof(experimentFrame);
+			//printf("ENCODING PACKET LEN %d\n",len);
+
+			encode_next_packet((unsigned char *)&experimentFrame, packet_buffer_to_fill);
 
 			packet_num = packet_buffer_to_fill; /* This is now the next buffer available */
 		}
@@ -104,7 +126,7 @@ void *telem_thread_process(void * arg) {
 	}
 	debug_print("Exiting Thread: %s\n", name);
 	called--;
-	free(telem_packet);
+//	free(telem_packet);
 	return EXIT_SUCCESS;
 }
 
@@ -118,13 +140,12 @@ int telem_thread_get_packet_num() {
 	return packet_num;
 }
 
-int gather_duv_telemetry(int type, duv_packet_t *packet) {
-
+int gather_duv_telemetry(uint8_t type) {
 	int rc = EXIT_SUCCESS;
 
 	/* Assign the spacecraft id */
-	packet->header.id = 0;
-	packet->header.extended_id = 3; /* SPACECRAFT_ID id 11 is 8 + 3 */
+	telem_buffer.header.id = 0;
+	telem_buffer.header.extended_id = 3; /* SPACECRAFT_ID id 11 is 8 + 3 */
 
 	/* Get the time stamps
 	 * We calculate an epoch as the number of years since 2020.  i.e. 2 indicates 2022
@@ -158,12 +179,12 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 	verbose_print("Storing Type %d Telemetry time and date: %s", type, asctime_r (timeptr, buffer) );
 
 	/* Build the header */
-	packet->header.epoch = epoch;
-	packet->header.uptime = uptime;
-	packet->header.type = type;
-	packet->header.safe_mode = false;
-	packet->header.health_mode = true;
-	packet->header.science_mode = false;
+	telem_buffer.header.epoch = epoch;
+	telem_buffer.header.uptime = uptime;
+	telem_buffer.header.type = type;
+	telem_buffer.header.safe_mode = false;
+	telem_buffer.header.health_mode = true;
+	telem_buffer.header.science_mode = false;
 
 	sched_yield();
 
@@ -186,7 +207,7 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		}
 		sched_yield();
 
-		packet->payload.pi_temperature = systemp; // pass this as tenths of a degree
+		telem_buffer.rtHealth.pi_temperature = systemp; // pass this as tenths of a degree
 		verbose_print("CPU temperature is %.2f degrees C\n",systemp/10.0);
 
 		/* Frequency of the CPU - reading from this file sometimes causes an XRUN */
@@ -196,21 +217,21 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		fclose(sys_file);
 		if (n == 0) {
 			error_print("Failed to read the CPU frequency\n");
-			packet->payload.cpu_speed = 0;
+			telem_buffer.rtHealth.cpu_speed = 0;
 		} else {
 			/* Value is in Hz.  We just want to know if it has dropped from 1.8MHz, so we just need 2 digits. */
-			packet->payload.cpu_speed = value / 100000;
+			telem_buffer.rtHealth.cpu_speed = value / 100000;
 		}
-		if (g_verbose)
-			print_duv_packet(packet);
+//		if (g_verbose)
+//			print_duv_packet(packet);
 
 		/* Audio loop time */
-		packet->payload.loop_time = get_loop_time_microsec()/100;
-		verbose_print("Audio loop time %.2f ms\n",packet->payload.loop_time/10.0);
+		telem_buffer.rtHealth.loop_time = get_loop_time_microsec()/100;
+		verbose_print("Audio loop time %.2f ms\n",telem_buffer.rtHealth.loop_time/10.0);
 
 		/* Xruns since we started running */
-		packet->payload.xruns = get_xruns_since_start();
-		verbose_print("Xruns since start %i\n",packet->payload.xruns);
+		telem_buffer.rtHealth.xruns = get_xruns_since_start();
+		verbose_print("Xruns since start %i\n",telem_buffer.rtHealth.xruns);
 
 #ifdef RASPBERRY_PI
 
@@ -219,9 +240,11 @@ int gather_duv_telemetry(int type, duv_packet_t *packet) {
 		if (lps25hb_one_shot_read() == 0) {
 			uint32_t raw_pressure;
 			get_lps25hb_pressure(&raw_pressure);
-			debug_print("PRESSURE: %.1f mbar ", (raw_pressure/4096.0));
+			telem_buffer.exp.pressure = raw_pressure;
+			verbose_print("PRESSURE: %.1f mbar ", (raw_pressure/4096.0));
 			uint16_t raw_temperature;
-                	get_lps25hb_temperature(&raw_temperature);
+			get_lps25hb_temperature(&raw_temperature);
+			telem_buffer.exp.temperature = raw_temperature;
 			/* For debug print need the signed int */
 			int16_t t = (int16_t) raw_temperature;
 			debug_print(" (Chip temp: %.1f C)\n", (42.5+t/480.0));
@@ -235,12 +258,14 @@ int16_t result;
      int g; 
      g = ads1015_read(CHANNEL_AIN1_FSR_6V, &result);
      if (g == 0) {
-         printf("MQ-2 Gas: %d %fV\n",result, 6.144*result/32767.0);
+    	 telem_buffer.exp.gas_sensor1 = result;
+         verbose_print("MQ-2 Gas: %d %fV\n",result, 6.144*result/32767.0);
      }
 
      g = ads1015_read(CHANNEL_AIN2_FSR_6V, &result);
      if (g == 0) {
-         printf("MQ-6 Gas: %d %fV\n",result, 6.144*result/32767.0);
+    	 telem_buffer.exp.gas_sensor2 = result;
+         verbose_print("MQ-6 Gas: %d %fV\n",result, 6.144*result/32767.0);
      }
 /*
      g = ads1015_read(CHANNEL_AIN3_FSR_6V, &result);
@@ -253,6 +278,11 @@ int16_t result;
 
 #endif /* RASPBERRY_PI */
 
+#ifdef LINUX
+     telem_buffer.exp.gas_sensor1 = 0x1234;
+     telem_buffer.exp.pressure = 0xDEAD;
+     telem_buffer.exp.temperature = 0xBEEF;
+#endif
 
 	return rc;
 }
@@ -320,7 +350,7 @@ int test_gather_duv_telemetry() {
 
 	int type = 1;
 	duv_packet_t *packet = (duv_packet_t*)calloc(DUV_DATA_LENGTH,sizeof(char)); // allocate 64 bytes for the packet data
-	fail = gather_duv_telemetry(type, packet);
+	fail = gather_duv_telemetry(type);
 	free(packet);
 
 	if (fail == EXIT_SUCCESS) {

@@ -55,7 +55,7 @@ void init_rd_state();
  * which buffer is available
  *
  */
-int encode_next_packet(duv_packet_t *packet, int encoded_packet_num);
+int encode_next_packet(unsigned char *packet, int encoded_packet_num);
 
 /*
  * Get the next bit for the encoded packet.
